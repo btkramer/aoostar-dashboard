@@ -1,0 +1,8 @@
+[Unit]
+Description=AOOSTAR WTR MAX dashboard container update check (registry digest compare)
+After=network-online.target local-fs.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/mnt/tank/apps/aoostar-dashboard/scripts/check-container-updates.sh

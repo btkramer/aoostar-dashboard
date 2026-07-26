@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="376" viewBox="0 0 960 376">
+  <rect width="960" height="376" fill="#0b1020"/>
+  <rect x="24" y="18" width="7" height="34" rx="2" fill="#38bdf8"/>
+  <text x="42" y="45" fill="#f8fafc" font-family="DejaVu Sans, sans-serif" font-size="37" font-weight="700" letter-spacing="1">WTR MAX</text>
+  <text x="910" y="40" fill="#64748b" font-family="DejaVu Sans, sans-serif" font-size="23" text-anchor="end" letter-spacing="2">CONTAINER OVERVIEW</text>
+  <line x1="24" y1="72" x2="936" y2="72" stroke="#3a4a68" stroke-width="2"/>
+  <g font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700" letter-spacing="1.5" fill="#64748b">
+    <text x="65" y="100">RUNNING</text><text x="293" y="100">HEALTHY</text><text x="521" y="100">ISSUES</text><text x="749" y="100">UPDATES</text>
+  </g>
+  <g fill="#38bdf8"><rect x="65" y="208" width="180" height="4" rx="2"/><rect x="293" y="208" width="180" height="4" rx="2"/><rect x="521" y="208" width="180" height="4" rx="2"/><rect x="749" y="208" width="180" height="4" rx="2"/></g>
+  <line x1="24" y1="228" x2="936" y2="228" stroke="#3a4a68" stroke-width="2"/>
+  <text x="65" y="256" fill="#64748b" font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700" letter-spacing="1.5">STATUS</text>
+  <circle cx="38" cy="351" r="11" fill="#22c55e"/><text x="60" y="358" fill="#94a3b8" font-family="DejaVu Sans, sans-serif" font-size="28">ONLINE</text>
+  <text x="895" y="356" fill="#475569" font-family="DejaVu Sans, sans-serif" font-size="24" text-anchor="end">AOOSTAR LCD</text>
+</svg>

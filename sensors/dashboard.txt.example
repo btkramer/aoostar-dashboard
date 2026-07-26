@@ -1,0 +1,10 @@
+cpu_percent: 18
+cpu_temperature: 41
+memory_usage: 63
+memory_detail: 40.3 GiB / 64.0 GiB
+pool_usage: 72
+pool_detail: 10.9 TiB / 15.0 TiB
+network_rx: 3.2 MiB/s
+network_tx: 640.0 KiB/s
+ip_address: 192.168.1.40
+date_time: Jul 24  14:42

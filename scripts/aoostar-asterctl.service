@@ -1,0 +1,16 @@
+[Unit]
+Description=AOOSTAR WTR MAX LCD dashboard (asterctl)
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/root/aoostar/asterctl \
+  --config /mnt/tank/apps/aoostar-dashboard/monitor.json \
+  --config-dir /mnt/tank/apps/aoostar-dashboard \
+  --font-dir /mnt/tank/apps/aoostar-dashboard/fonts \
+  --sensor-path /mnt/tank/apps/aoostar-dashboard/sensors
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

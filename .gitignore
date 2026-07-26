@@ -1,0 +1,9 @@
+sensors/dashboard.txt
+sensors/.network-state
+sensors/containers.txt
+sensors/.updates-cache
+logs/*.log
+*.pid
+nohup.out
+monitor.json.bak
+monitor.json.before-required-fields

@@ -1,0 +1,12 @@
+[Unit]
+Description=AOOSTAR WTR MAX dashboard sensor generator loop
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'while true; do /mnt/tank/apps/aoostar-dashboard/scripts/generate-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/generate-container-sensors.sh; sleep 5; done'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

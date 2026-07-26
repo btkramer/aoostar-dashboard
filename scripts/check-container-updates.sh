@@ -17,6 +17,9 @@ LOG_FILE="$DASHBOARD_DIR/logs/container-updates.log"
 ACCEPT='Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json'
 
 mkdir -p "$OUT_DIR" "$(dirname "$LOG_FILE")"
+# Truncated at the start of each run, not appended -- this only runs once a
+# day, so there's no need to accumulate history; last run's log is enough.
+: > "$LOG_FILE"
 log() { printf '%s %s\n' "$(date '+%F %T')" "$1" >> "$LOG_FILE"; }
 
 if ! command -v docker >/dev/null 2>&1; then

@@ -9,7 +9,26 @@ OUT_DIR="$DASHBOARD_DIR/sensors"
 OUT_FILE="$OUT_DIR/containers.txt"
 UPDATES_CACHE="$OUT_DIR/.updates-cache"
 MAX_NAMES=3
-MAX_CHARS=60
+# Budget for the name-list portion only, after its "Issues: "/"Updates: "
+# prefix -- measured against the real font at the layout's fontSize (36px)
+# and the text start x (81px, after the 2026-07-29 status-circle column was
+# added before it) with a safety margin below the available line width,
+# using the longest real container names in this stack
+# (nginx-proxy-manager, audiobookshelf, paperless-broker) as the worst
+# case. Recompute (scripts/render-preview.py + PIL) if fontSize, text x,
+# or the panel width ever changes -- don't just carry this number forward.
+# Bumped 31->34->36 (2026-07-29, user request both times: after 34 shipped,
+# user reported plenty of visible room still on the real device). Budget
+# MINUS the "Updates: "/"Issues: " prefix width (165px/124px at this
+# fontSize) -- the prefix eats into the same line, easy to forget since
+# MAX_CHARS only counts the name-list portion. 36 lands 4px past the
+# panel's divider-line inset (x:24-936, the boundary every other page
+# element respects) but still 20px clear of the true PNG canvas edge
+# (x:960) for the worst case (longest prefix + longest real container
+# names in this stack). 38 is the hard max (0px left at the canvas edge,
+# no buffer) -- don't push past 36 without the user confirming on-device
+# again, this is now past the design inset, not just the safety margin.
+MAX_CHARS=36
 
 mkdir -p "$OUT_DIR"
 
@@ -75,24 +94,69 @@ join_list() {
   printf '%s' "$out"
 }
 
-if [ "$issues_count" -eq 0 ] && [ "$updates_count" -eq 0 ]; then
-  # HarmonyOS_Sans_SC_Bold.ttf has no glyph for a real checkmark (U+2713/U+2714)
-  # -- it renders blank on the LCD. sqrt sign is the closest glyph the font
-  # actually has.
-  detail="√ Everything Healthy"
-elif [ "$issues_count" -gt 0 ]; then
-  detail="$(join_list "${issues[@]}")"
+# Two independent lines (2026-07-28 redesign) rather than one line that
+# prioritized issues over updates -- both statuses are now always visible
+# at once instead of updates silently disappearing whenever issues exist.
+if [ "$issues_count" -eq 0 ]; then
+  detail="Everything Healthy"
 else
-  detail="$(join_list "${updates[@]}")"
+  detail="Issues: $(join_list "${issues[@]}")"
 fi
 
+if [ "$updates_count" -eq 0 ]; then
+  updates_detail="Updates: None"
+else
+  updates_detail="Updates: $(join_list "${updates[@]}")"
+fi
+
+# Status-circle columns (2026-07-29): asterctl has no data-driven text
+# color at all -- fontColor is fixed per field in monitor.json, confirmed
+# from crates/asterctl/src/format_value.rs, so a single field can't turn
+# red/green based on content. Workaround: two fields at the exact same
+# x/y, each a fixed color, where only one ever has non-empty text at a
+# time -- the "off" one renders nothing. HarmonyOS_Sans_SC_Bold has a real
+# "●" glyph (confirmed non-empty via PIL getmask earlier in this project,
+# same font that lacks a real checkmark glyph -- unrelated character, does
+# have this one).
+dot='●'
+if [ "$issues_count" -eq 0 ]; then
+  status_ok="$dot"; status_bad=""
+else
+  status_ok=""; status_bad="$dot"
+fi
+if [ "$updates_count" -eq 0 ]; then
+  updates_ok="$dot"; updates_warn=""
+else
+  updates_ok=""; updates_warn="$dot"
+fi
+
+# These 4 counts have no natural unit character (unlike %/°F fields
+# elsewhere), so there's nothing to embed that would force asterctl's
+# numeric parser to fail and fall through to raw-text passthrough -- which
+# is the only way to get "leading zero under 100, natural width past it"
+# (asterctl's own integerDigits only supports always-fixed-width or
+# unpadded, confirmed from crates/asterctl/src/format_value.rs). Appending
+# a zero-width space (U+200B) is an attempt to get that passthrough
+# invisibly: it's not in Unicode's White_Space set, so Rust's .trim() (in
+# sensors.rs) won't strip it before the value reaches format_value, and it
+# breaks a plain-integer parse just like a real unit character would.
+# CONFIRMED working on the physical device/font as of 2026-07-28 -- renders
+# invisibly, no stray box. If a future font change ever breaks this, revert
+# is just dropping ${zwsp} below (asterctl's own integerDigits:2 in
+# monitor.json is already the correct fallback, no JSON change needed).
+zwsp=$'\u200b'
 tmp=$(mktemp "$OUT_DIR/.containers.XXXXXX")
 cat > "$tmp" <<EOF
-containers_running: $running
-containers_healthy: $healthy
-containers_issues: $issues_count
-containers_updates: $updates_count
+containers_running: ${running}${zwsp}
+containers_healthy: ${healthy}${zwsp}
+containers_issues: ${issues_count}${zwsp}
+containers_updates: ${updates_count}${zwsp}
+containers_status_ok: $status_ok
+containers_status_bad: $status_bad
 containers_detail: $detail
+containers_updates_ok: $updates_ok
+containers_updates_warn: $updates_warn
+containers_updates_detail: $updates_detail
 EOF
 cat "$tmp" > "$OUT_FILE"
 rm "$tmp"

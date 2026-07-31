@@ -152,20 +152,50 @@ later pages) Docker being available.
 
 ## Data inputs
 
-`generate-sensors.sh` consumes the existing `aster-sysinfo` key/value file
-when available and aliases its field names to this dashboard. It calculates
-memory used/total and samples the selected network interface to produce
-rates. Pool values are intentionally configured via `POOL_USED` and
-`POOL_TOTAL` until a preferred TrueNAS source is selected.
+`generate-sensors.sh` reads everything directly from the OS rather than a
+vendor sensor file — the AOOSTAR-X `aster-sysinfo` file it originally read
+from (`/root/aoostar/sensors/sysinfo.txt`) turned out to be a one-time
+snapshot written at initial device setup, never live, so relying on it was
+a dead end:
+- **CPU usage** — delta of `/proc/stat`'s aggregate `cpu` line between
+  consecutive runs of this script (state in `sensors/.cpu-state`).
+- **CPU temperature** — the `k10temp` hwmon driver's `Tctl` sensor (this
+  box is an AMD Ryzen APU), found by hwmon *name* rather than a hardcoded
+  `hwmonN` path since that index isn't stable across reboots.
+- **Memory** — `/proc/meminfo`'s `MemTotal`/`MemAvailable`.
+- **Pool usage** — `zfs list -Hp -o used,avail` on `POOL_NAME` (live, exact
+  bytes); `POOL_USED`/`POOL_TOTAL` env vars can still override it for
+  testing without real ZFS state.
+- **Network** — rate is sampled from the selected interface's
+  `/sys/class/net/*/statistics` counters between runs, same delta pattern
+  as CPU usage.
 
 `generate-container-sensors.sh` reads only from `docker ps`/`docker inspect`
 (local, no network) plus the cache file written by
 `check-container-updates.sh`.
 
+`generate-storage-sensors.sh` (Page 3) reads:
+- **Read/write throughput** — delta of `/proc/diskstats` sectors
+  read/written (sector = fixed 512 bytes) summed across the pool's member
+  disks, same pattern as CPU/network. Pool member disks are found
+  dynamically (any block device with a `drivetemp` hwmon sensor attached),
+  not hardcoded.
+- **Disk temperature avg/hottest** — same `drivetemp` hwmon devices, read
+  directly (same technique as `cpu_temperature`'s `k10temp` lookup).
+- **Pool capacity** — not recomputed; this panel reuses the
+  `pool_usage`/`pool_detail` keys already written by `generate-sensors.sh`
+  (asterctl merges every `*.txt` file under `--sensor-path` into one
+  key/value map, so any panel can reference any key from any file).
+
 ## Next pages
 
-Add storage and temperature panels to `monitor.json` once Container Overview
-has been validated on the physical LCD, followed by an alert-interrupt
-supervisor (asterctl has no hot-reload or live override, so an alert has to
-swap in a single-panel config and restart the process, then revert once
-clear).
+Page 3 (Storage) is live. Add Page 4 (Temperature: CPU/GPU/NVMe/hottest
+HDD) next, followed by an alert-interrupt supervisor (asterctl has no
+hot-reload or live override, so an alert has to swap in a single-panel
+config and restart the process, then revert once clear).
+
+Note: `img/storage-overview.png` was generated with
+`scripts/render-storage-bg.py` (plain PIL), not `rsvg-convert` — no
+working SVG rasterizer has been available in any sandbox session on this
+project so far. If one ever is, prefer regenerating from the SVG source
+the normal way; keep the two in sync by hand until then.

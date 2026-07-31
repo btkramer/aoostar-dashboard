@@ -2,6 +2,10 @@ sensors/dashboard.txt
 sensors/.network-state
 sensors/containers.txt
 sensors/.updates-cache
+sensors/storage.txt
+sensors/.cpu-state
+sensors/.disk-io-state
+sensors/.containers.*
 logs/*.log
 *.pid
 nohup.out

@@ -17,6 +17,7 @@ BG = (11, 16, 32)          # #0b1020
 ACCENT = (56, 189, 248)    # #38bdf8
 WHITE = (248, 250, 252)    # #f8fafc
 KICKER = (148, 163, 184)   # #94a3b8 (bumped from #64748b 2026-07-29, brighter per user request)
+PAGE_LABEL = (203, 213, 225) # #cbd5e1, brighter than KICKER (page title, top right)
 LABEL = (148, 163, 184)    # #94a3b8
 DIVIDER = (58, 74, 104)    # #3a4a68
 
@@ -28,7 +29,7 @@ img = Image.new("RGB", (W, H), BG)
 d = ImageDraw.Draw(img)
 
 
-def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False):
+def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False, anchor_middle=False):
     """Draws text char-by-char with extra letter-spacing, matching SVG's
     letter-spacing behavior (added after every glyph including the last,
     which is what right-aligned/text-anchor=end measurements use). xy's y
@@ -45,6 +46,8 @@ def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False):
     total = sum(widths) + spacing * len(text)
     if anchor_end:
         x -= total
+    elif anchor_middle:
+        x -= total / 2
     cx = x
     for c, w in zip(text, widths):
         d.text((cx, y), c, font=font, fill=fill)
@@ -52,16 +55,19 @@ def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False):
 
 
 # Header
-d.rounded_rectangle((24, 18, 24 + 7, 18 + 34), radius=2, fill=ACCENT)
-draw_spaced((42, 45), "TrueNAS", bold(37), WHITE, spacing=1)
-draw_spaced((910, 40), "STORAGE OVERVIEW", reg(27), KICKER, spacing=2, anchor_end=True)
+d.rounded_rectangle((24, 18, 24 + 7, 18 + 35), radius=2, fill=ACCENT)
+draw_spaced((42, 53), "TrueNAS", bold(43), WHITE, spacing=1)
+draw_spaced((910, 40), "STORAGE OVERVIEW", reg(30), PAGE_LABEL, spacing=2, anchor_end=True)
 d.line((24, 72, 936, 72), fill=DIVIDER, width=2)
 
-# Row 1 labels + blue bars
+# Row 1 labels + blue bars -- reworked to 4 columns 2026-07-31
+# (NVME/SCRUB/READ/WRITE, replacing POOL/READ/WRITE -- see storage-overview.svg
+# for why), centered at each column's center x=155/383/611/839 (bar_x+90)
+# per a global "center everything" request; bars stay at 65/293/521/749.
 label_font = bold(24)
-for x, text in [(65, "POOL"), (335, "READ"), (665, "WRITE")]:
-    draw_spaced((x, 100), text, label_font, LABEL, spacing=1.5)
-for x in (65, 335, 665):
+for x, text in [(155, "NVME"), (383, "SCRUB"), (611, "READ"), (839, "WRITE")]:
+    draw_spaced((x, 100), text, label_font, LABEL, spacing=1.5, anchor_middle=True)
+for x in (65, 293, 521, 749):
     d.rounded_rectangle((x, 194, x + 180, 194 + 4), radius=2, fill=ACCENT)
 
 d.line((24, 216, 936, 216), fill=DIVIDER, width=2)

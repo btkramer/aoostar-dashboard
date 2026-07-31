@@ -1,11 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="376" viewBox="0 0 960 376">
   <rect width="960" height="376" fill="#0b1020"/>
-  <rect x="24" y="18" width="7" height="34" rx="2" fill="#38bdf8"/>
-  <text x="42" y="45" fill="#f8fafc" font-family="DejaVu Sans, sans-serif" font-size="37" font-weight="700" letter-spacing="1">TrueNAS</text>
-  <text x="910" y="40" fill="#94a3b8" font-family="DejaVu Sans, sans-serif" font-size="27" text-anchor="end" letter-spacing="2">STORAGE OVERVIEW</text>
+  <rect x="24" y="18" width="7" height="35" rx="2" fill="#38bdf8"/>
+  <text x="42" y="53" fill="#f8fafc" font-family="DejaVu Sans, sans-serif" font-size="43" font-weight="700" letter-spacing="1">TrueNAS</text>
+  <text x="910" y="40" fill="#cbd5e1" font-family="DejaVu Sans, sans-serif" font-size="30" text-anchor="end" letter-spacing="2">STORAGE OVERVIEW</text>
   <line x1="24" y1="72" x2="936" y2="72" stroke="#3a4a68" stroke-width="2"/>
-  <g font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700" letter-spacing="1.5" fill="#94a3b8">
-    <text x="65" y="100">POOL</text><text x="335" y="100">READ</text><text x="665" y="100">WRITE</text>
+  <!-- Row 1 reworked to 4 columns 2026-07-31: old col-1 "POOL" headline
+       showed pool_status_ok/_bad ("ONLINE"/error text), redundant with the
+       footer's status dot+text in the bottom-left of all 3 pages. Col 1 is
+       now NVME (capacity, new generate-storage-sensors.sh nvme_usage/
+       nvme_detail); the old sub-detail scrub line is promoted to its own
+       SCRUB column; READ/WRITE shift right. x=155/383/611/839 (column
+       centers, bar_x+90) matches Page 1/2's spacing, all centered per a
+       global "center everything" request (was left-aligned at the bar
+       starts, 65/293/521/749). -->
+  <g font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700" letter-spacing="1.5" fill="#94a3b8" text-anchor="middle">
+    <text x="155" y="100">NVME</text><text x="383" y="100">SCRUB</text><text x="611" y="100">READ</text><text x="839" y="100">WRITE</text>
   </g>
   <!-- Row 2 "DISK TEMP AVG"/"HOTTEST DISK" headers removed 2026-07-29:
        replaced by a live 5-column per-disk temp+health grid (monitor.json
@@ -13,7 +22,7 @@
        y:280 temp / y:316 health) -- each disk's own name is embedded in
        its temp line ("sda 108°F"), so no separate header row is needed.
        See generate-storage-sensors.sh. -->
-  <g fill="#38bdf8"><rect x="65" y="194" width="180" height="4" rx="2"/><rect x="335" y="194" width="180" height="4" rx="2"/><rect x="665" y="194" width="180" height="4" rx="2"/></g>
+  <g fill="#38bdf8"><rect x="65" y="194" width="180" height="4" rx="2"/><rect x="293" y="194" width="180" height="4" rx="2"/><rect x="521" y="194" width="180" height="4" rx="2"/><rect x="749" y="194" width="180" height="4" rx="2"/></g>
   <line x1="24" y1="216" x2="936" y2="216" stroke="#3a4a68" stroke-width="2"/>
   <!-- Footer status dot + "ONLINE"/state text (2026-07-29): moved from
        static SVG chrome to live monitor.json sensor fields (footer_dot_ok/

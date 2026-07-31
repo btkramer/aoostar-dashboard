@@ -5,7 +5,14 @@ sensors/.updates-cache
 sensors/storage.txt
 sensors/.cpu-state
 sensors/.disk-io-state
+sensors/.arc-state
+sensors/.alert-state
+sensors/alert.txt
 sensors/.containers.*
+sensors/.dashboard.*
+sensors/.storage.*
+sensors/.alert.*
+.monitor.json.*
 logs/*.log
 *.pid
 nohup.out

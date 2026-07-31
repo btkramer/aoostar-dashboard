@@ -4,7 +4,7 @@ After=local-fs.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash -c 'while true; do /mnt/tank/apps/aoostar-dashboard/scripts/generate-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/generate-container-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/generate-storage-sensors.sh; sleep 5; done'
+ExecStart=/bin/bash -c 'while true; do /mnt/tank/apps/aoostar-dashboard/scripts/generate-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/generate-container-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/generate-storage-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/check-alert-supervisor.sh; sleep 5; done'
 Restart=always
 RestartSec=5
 

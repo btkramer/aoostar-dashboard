@@ -8,12 +8,30 @@ OUT_FILE="$OUT_DIR/dashboard.txt"
 NET_IFACE="${NET_IFACE:-enp101s0}"
 POOL_NAME="${POOL_NAME:-tank}"
 STATE_FILE="$OUT_DIR/.network-state"
+# High-temp red thresholds (added 2026-07-31, same "all temps everywhere"
+# request that added disk temp color-coding on Page 3 -- see
+# generate-storage-sensors.sh's DISK_TEMP_HIGH_F for that one). Silicon
+# runs far hotter than spinning disks before it's actually a concern, so
+# these defaults are much higher than the disk grid's 130°F -- 185°F
+# (~85°C) is comfortably below this chip's typical throttle point
+# (Ryzen APUs are usually ~95°C/203°F for Tctl) while still well above
+# normal idle/light-load readings (98°F CPU / 108°F GPU observed on this
+# box), i.e. a "running hot" flag, not a "about to throttle" one. Not
+# confirmed against this specific chip's datasheet -- tune via the env
+# vars if these don't fit. Unlike the disk grid, there's no "hottest of
+# the group" concept for a single CPU/single GPU reading, so these are
+# just two-tier (normal/over), not three-tier (normal/hot/over).
+CPU_TEMP_HIGH_F="${CPU_TEMP_HIGH_F:-185}"
+GPU_TEMP_HIGH_F="${GPU_TEMP_HIGH_F:-185}"
 
 mkdir -p "$OUT_DIR"
 # Binary (1024-based) math -- matches what `zfs list`/`df`/the TrueNAS UI
 # actually compute -- but labeled "TB"/"GB"/"KB" without the "i", matching how
 # those same tools display it and how most people read storage sizes.
-human_bytes() { awk -v b="${1:-0}" -v p="${2:-2}" 'BEGIN { split("B KB MB GB TB",u," "); i=1; while (b>=1024 && i<5) {b/=1024;i++} printf "%.*f %s",p,b,u[i] }'; }
+# KB is the smallest unit shown (i starts at 2, with an unconditional first
+# /1024) -- raw bytes ("512 B") aren't useful at this dashboard's scale and
+# read as noise next to the KB/MB/GB/TB values everywhere else.
+human_bytes() { awk -v b="${1:-0}" -v p="${2:-2}" 'BEGIN { split("B KB MB GB TB",u," "); i=2; b/=1024; while (b>=1024 && i<5) {b/=1024;i++} printf "%.*f %s",p,b,u[i] }'; }
 
 # CPU usage: read directly from /proc/stat rather than the vendor's
 # sysinfo.txt -- that file turned out to be a one-time snapshot from initial
@@ -49,6 +67,23 @@ for hw in /sys/class/hwmon/*; do
   fi
 done
 cpu_temp=$(awk -v c="$cpu_temp_c" 'BEGIN { printf "%.1f", c * 9 / 5 + 32 }')
+# GPU usage + temperature: this box's AMD Ryzen APU exposes iGPU load via
+# the amdgpu kernel driver's gpu_busy_percent sysfs file (a sibling of the
+# PCI device dir, not under hwmon -- hwmon only carries the temp/power
+# sensors), found by walking hwmon for the "amdgpu" name and using its
+# device symlink to locate the PCI device dir, same "find by name, don't
+# hardcode a path" rule as k10temp/drivetemp elsewhere in this script.
+gpu_percent=0
+gpu_temp_c=0
+for hw in /sys/class/hwmon/*; do
+  if [ -r "$hw/name" ] && [ "$(cat "$hw/name")" = "amdgpu" ]; then
+    dev_dir=$(readlink -f "$hw/device")
+    [ -r "$dev_dir/gpu_busy_percent" ] && gpu_percent=$(cat "$dev_dir/gpu_busy_percent")
+    [ -r "$hw/temp1_input" ] && gpu_temp_c=$(awk -v m="$(cat "$hw/temp1_input")" 'BEGIN { printf "%.1f", m/1000 }')
+    break
+  fi
+done
+gpu_temp=$(awk -v c="$gpu_temp_c" 'BEGIN { printf "%.1f", c * 9 / 5 + 32 }')
 # Memory: read directly from /proc/meminfo. MemAvailable (not MemFree)
 # accounts for reclaimable cache/buffers -- it's the figure `free -h`/htop
 # use for "actually free for new allocations", matching what people expect
@@ -57,7 +92,15 @@ mem_total_kb=$(awk '/^MemTotal:/{print $2}' /proc/meminfo)
 mem_avail_kb=$(awk '/^MemAvailable:/{print $2}' /proc/meminfo)
 mem_used_kb=$((mem_total_kb - mem_avail_kb))
 mem_percent=$(awk -v u="$mem_used_kb" -v t="$mem_total_kb" 'BEGIN { if(t>0) printf "%.0f",100*u/t; else print 0 }')
-mem_detail="$(human_bytes $((mem_used_kb * 1024))) / $(human_bytes $((mem_total_kb * 1024)))"
+# Tightened format (2026-07-31, Page 1 4-column redesign to fit a new GPU
+# column): "24.9/31.3 GB" instead of the old "24.89 GB / 31.32 GB" -- the
+# old string (258px at fontSize 27) doesn't fit the new 228px column pitch
+# (65/293/521/749, matching Page 2's spacing), the new one (168px) does.
+# Unit dropped from the first (used) number since it's implied by the
+# second -- only the total's human_bytes call keeps its unit suffix.
+mem_used_fmt="$(human_bytes $((mem_used_kb * 1024)) 1)"
+mem_total_fmt="$(human_bytes $((mem_total_kb * 1024)) 1)"
+mem_detail="${mem_used_fmt% *}/${mem_total_fmt}"
 
 # Real usable-capacity pool usage from the root dataset (used/avail, exact
 # bytes via -p). Deliberately `zfs list`, not `zpool list` -- zpool's
@@ -72,7 +115,10 @@ if [ -z "${POOL_USED:-}" ] || [ -z "${POOL_TOTAL:-}" ]; then
   POOL_TOTAL="${POOL_TOTAL:-$(( ${zfs_used:-0} + ${zfs_avail:-0} ))}"
 fi
 pool_percent=$(awk -v u="$POOL_USED" -v t="$POOL_TOTAL" 'BEGIN { if(t>0) printf "%.0f",100*u/t; else print 0 }')
-pool_detail="$(human_bytes "$POOL_USED") / $(human_bytes "$POOL_TOTAL")"
+# Tightened format -- same reasoning as mem_detail above.
+pool_used_fmt="$(human_bytes "$POOL_USED" 1)"
+pool_total_fmt="$(human_bytes "$POOL_TOTAL" 1)"
+pool_detail="${pool_used_fmt% *}/${pool_total_fmt}"
 
 rx_file="/sys/class/net/$NET_IFACE/statistics/rx_bytes"; tx_file="/sys/class/net/$NET_IFACE/statistics/tx_bytes"
 rx_now=0; tx_now=0; [ -r "$rx_file" ] && rx_now=$(<"$rx_file"); [ -r "$tx_file" ] && tx_now=$(<"$tx_file")
@@ -97,23 +143,71 @@ uptime_display=$(awk -v s="$uptime_seconds" 'BEGIN {
   else printf "%dm", m
 }')
 
-# Active connections: ESTABLISHED sockets on the SMB (445) and NFS (2049)
-# ports, read straight from /proc/net/tcp{,6} -- no dependency on
-# smbstatus/nfsstat/ss, which aren't guaranteed present (matches this
-# project's general preference for /proc over CLI tools that might not be
-# on PATH, e.g. cpu_percent/network_rx above). Port numbers are matched as
-# fixed-width uppercase hex strings ("01BD"=445, "0801"=2049) rather than
-# converted to decimal -- portable across awk implementations without
-# strtonum() (this box's awk isn't gawk). This counts raw TCP connections,
-# not distinct clients/users -- a client can hold more than one (SMB
-# multichannel, repeated short-lived NFS RPCs), so treat it as "how much
-# is this box being talked to" rather than a precise session count.
+# Active connections (broadened 2026-07-31 -- was SMB/NFS-only, then
+# widened to all inbound connections same day, then refined again same day
+# after real `ss -tnp state established` output from the box showed the
+# first widening drastically overcounted). Read straight from
+# /proc/net/tcp{,6} -- no dependency on ss/netstat, which aren't
+# guaranteed present. Counts ESTABLISHED (state 01) sockets whose LOCAL
+# port matches a real LISTEN (state 0A) port on this box, which separates
+# inbound (someone connecting to a service we offer) from outbound (a
+# container reaching out to the internet -- random high local port, not a
+# listening one, excluded automatically).
+#
+# That alone still overcounted heavily on the real box: `docker-proxy`
+# (Docker's userspace port-forwarder) shows up as established connections
+# FROM other containers' bridge IPs (172.16-31.x.x, Docker's default IPAM
+# range) TO this box's published ports -- e.g. redis on :6380 was hit by
+# a dozen+ such connections from a single other container, none of them a
+# real client. Same issue for services proxying to each other via this
+# box's own LAN IP instead of localhost (seen live: nginx -> Jellyfin as
+# `192.168.1.5:8096 <- 192.168.1.5:50530`, not caught by a 127.0.0.1-only
+# loopback check since it's not loopback, it's the box's real IP talking
+# to itself). Fixed by excluding both: any remote address in
+# 172.16.0.0/12 (Docker's private range -- real LAN clients are on the
+# home network's own subnet, e.g. 192.168.x.x, never overlaps), and any
+# remote address equal to this box's own IP ($ip_address, computed above).
+# True 127.0.0.1 loopback is also still excluded. hex2dec/is_internal are
+# plain string-index hex parsing, not strtonum() (this box's awk isn't
+# gawk, strtonum isn't portable here).
+# KNOWN LIMITATION: this only catches the two noise patterns actually
+# observed on the box (Docker bridge-range peers, self-via-LAN-IP) -- a
+# container reaching this box's published port from some OTHER private
+# range, or IPv6 loopback/self traffic, wouldn't be caught. Good enough
+# for "how many real clients, approximately," not a guaranteed-exact count.
 tcp_files=(/proc/net/tcp)
 [ -r /proc/net/tcp6 ] && tcp_files+=(/proc/net/tcp6)
-active_connections=$(awk '
-  FNR>1 { split($2,a,":"); port=a[2]; st=$4
-    if (st=="01" && (port=="01BD" || port=="0801")) c++ }
-  END { print c+0 }
+active_connections=$(awk -v own_ip="$ip_address" '
+  function hex2dec(h,    i, v, c) {
+    v = 0
+    for (i = 1; i <= length(h); i++) {
+      c = substr(h, i, 1)
+      v = v * 16 + index("0123456789ABCDEF", c) - 1
+    }
+    return v
+  }
+  function is_internal(raddr,    b1, b2, b3, b4, dotted) {
+    b1 = hex2dec(substr(raddr,7,2)); b2 = hex2dec(substr(raddr,5,2))
+    if (b1 == 127) return 1
+    if (b1 == 172 && b2 >= 16 && b2 <= 31) return 1
+    b3 = hex2dec(substr(raddr,3,2)); b4 = hex2dec(substr(raddr,1,2))
+    dotted = b1"."b2"."b3"."b4
+    if (dotted == own_ip) return 1
+    return 0
+  }
+  FNR>1 {
+    split($2,loc,":"); lport=loc[2]
+    split($3,rem,":"); raddr=rem[1]
+    st=$4
+    if (st=="0A") { listen[lport]=1 }
+    else if (st=="01") { n++; el[n]=lport; er[n]=raddr }
+  }
+  END {
+    for (i=1;i<=n;i++) {
+      if ((el[i] in listen) && !is_internal(er[i])) c++
+    }
+    print c+0
+  }
 ' "${tcp_files[@]}" 2>/dev/null)
 active_connections=${active_connections:-0}
 
@@ -134,14 +228,32 @@ active_connections=${active_connections:-0}
 # (e.g. the planned alert supervisor): these three fields are no longer
 # bare numbers -- strip the trailing %/°F before doing numeric comparisons.
 pct() { awk -v v="$1" 'BEGIN { printf "%02.0f%%", v }'; }
+
+# CPU/GPU temp red-threshold color-toggle (added 2026-07-31, same trick as
+# the disk grid's three-tier version, but two-tier here since a single
+# CPU/GPU reading has no "hottest of the group" to highlight -- just
+# normal vs over threshold).
+cpu_temp_str=$(awk -v v="$cpu_temp" 'BEGIN { printf "%02.0f°F", v }')
+cpu_temp_rounded=$(awk -v v="$cpu_temp" 'BEGIN { printf "%.0f", v }')
+cpu_temperature_normal=""; cpu_temperature_over=""
+if [ "$cpu_temp_rounded" -gt "$CPU_TEMP_HIGH_F" ]; then cpu_temperature_over="$cpu_temp_str"; else cpu_temperature_normal="$cpu_temp_str"; fi
+gpu_temp_str=$(awk -v v="$gpu_temp" 'BEGIN { printf "%02.0f°F", v }')
+gpu_temp_rounded=$(awk -v v="$gpu_temp" 'BEGIN { printf "%.0f", v }')
+gpu_temperature_normal=""; gpu_temperature_over=""
+if [ "$gpu_temp_rounded" -gt "$GPU_TEMP_HIGH_F" ]; then gpu_temperature_over="$gpu_temp_str"; else gpu_temperature_normal="$gpu_temp_str"; fi
+
 tmp=$(mktemp "$OUT_DIR/.dashboard.XXXXXX")
 cat > "$tmp" <<EOF
 cpu_percent: $(pct "$cpu_percent")
-cpu_temperature: $(awk -v v="$cpu_temp" 'BEGIN { printf "%02.0f°F", v }')
+cpu_temperature_normal: $cpu_temperature_normal
+cpu_temperature_over: $cpu_temperature_over
 memory_usage: $(pct "$mem_percent")
 memory_detail: $mem_detail
 pool_usage: $(pct "$pool_percent")
 pool_detail: $pool_detail
+gpu_percent: $(pct "$gpu_percent")
+gpu_temperature_normal: $gpu_temperature_normal
+gpu_temperature_over: $gpu_temperature_over
 network_rx: $(human_bytes "$rx_rate" 0)/s
 network_tx: $(human_bytes "$tx_rate" 0)/s
 ip_address: $ip_address

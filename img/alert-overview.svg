@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="376" viewBox="0 0 960 376">
+  <!-- Solid amber fill (not the usual dark #0b1020) -- user explicitly
+       wanted this page to grab attention like a hazard sign, not just be
+       a themed variant of the normal dark pages. Body text is dark
+       (reusing the normal pages' #0b1020 background AS the alert page's
+       text color -- a deliberate inversion, easy to remember), the
+       accent bar/kicker stay red for a hazard-sign red-on-yellow
+       highlight. Content area below the header divider has no static
+       chrome (no columns/bars needed for a page that's just a list) --
+       alert_line1..6 (monitor.json) are all dynamic, populated by
+       scripts/check-alert-supervisor.sh. Only shown in the mianban
+       rotation while at least one condition is active. -->
+  <rect width="960" height="376" fill="#f59e0b"/>
+  <rect x="24" y="18" width="7" height="35" rx="2" fill="#ef4444"/>
+  <text x="42" y="53" fill="#0b1020" font-family="DejaVu Sans, sans-serif" font-size="43" font-weight="700" letter-spacing="1">TrueNAS</text>
+  <text x="910" y="40" fill="#ef4444" font-family="DejaVu Sans, sans-serif" font-size="30" text-anchor="end" letter-spacing="2">⚠ ACTIVE ALERTS</text>
+  <line x1="24" y1="72" x2="936" y2="72" stroke="#0b1020" stroke-width="2"/>
+</svg>

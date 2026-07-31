@@ -166,9 +166,17 @@ a dead end:
 - **Pool usage** — `zfs list -Hp -o used,avail` on `POOL_NAME` (live, exact
   bytes); `POOL_USED`/`POOL_TOTAL` env vars can still override it for
   testing without real ZFS state.
+- **GPU usage/temperature** (added 2026-07-31) — `gpu_busy_percent` under
+  the `amdgpu` PCI device's sysfs dir (found via the `amdgpu` hwmon entry's
+  `device` symlink, not a hardcoded path) and that same hwmon's
+  `temp1_input`.
 - **Network** — rate is sampled from the selected interface's
   `/sys/class/net/*/statistics` counters between runs, same delta pattern
   as CPU usage.
+
+`memory_detail`/`pool_detail` are pre-formatted as `"used/total UNIT"`
+(e.g. `"24.9/31.3 GB"`) rather than asterctl's own digit handling — needed
+to fit Page 1's 4-column layout (see below).
 
 `generate-container-sensors.sh` reads only from `docker ps`/`docker inspect`
 (local, no network) plus the cache file written by
@@ -180,22 +188,34 @@ a dead end:
   disks, same pattern as CPU/network. Pool member disks are found
   dynamically (any block device with a `drivetemp` hwmon sensor attached),
   not hardcoded.
-- **Disk temperature avg/hottest** — same `drivetemp` hwmon devices, read
-  directly (same technique as `cpu_temperature`'s `k10temp` lookup).
-- **Pool capacity** — not recomputed; this panel reuses the
-  `pool_usage`/`pool_detail` keys already written by `generate-sensors.sh`
-  (asterctl merges every `*.txt` file under `--sensor-path` into one
-  key/value map, so any panel can reference any key from any file).
+- **Per-disk temperature/health** — same `drivetemp` hwmon devices, read
+  directly (same technique as `cpu_temperature`'s `k10temp` lookup), plus
+  each disk's leaf state from `zpool status -L`.
+- **Pool health/scrub** — `zpool status -L`'s `state:`/`scan:` blocks
+  (col 2, "SCRUB"). Also drives the shared footer status dot/text on all 3
+  pages (asterctl merges every `*.txt` under `--sensor-path` into one
+  key/value map).
+- **NVMe capacity** (added 2026-07-31, col 1, "NVME") — `zfs list -Hp -o
+  used,avail` on `NVME_POOL_NAME` (default `boot-pool`, TrueNAS SCALE's
+  install default), same used/avail-not-alloc/size reasoning as pool
+  usage above. **Not yet verified against a real boot-pool** — `zfs` isn't
+  on PATH in the sandbox this was built in, and the box's actual boot-pool
+  name was only inferred, never confirmed with `zpool status`.
 
 ## Next pages
 
-Page 3 (Storage) is live. Add Page 4 (Temperature: CPU/GPU/NVMe/hottest
-HDD) next, followed by an alert-interrupt supervisor (asterctl has no
+Pages 1–3 are live. A standalone Page 4 (Temperature) was considered but
+dropped 2026-07-31 — its planned CPU/hottest-HDD readings were already on
+Pages 1/3, so only GPU (now Page 1) and NVMe capacity (now Page 3) were
+genuinely new; both got folded into the existing pages instead. See
+MASTER_PLAN.md's "2026-07-31: Page 1/3 four-column rework" section for the
+full change list. Next up: an alert-interrupt supervisor (asterctl has no
 hot-reload or live override, so an alert has to swap in a single-panel
 config and restart the process, then revert once clear).
 
-Note: `img/storage-overview.png` was generated with
-`scripts/render-storage-bg.py` (plain PIL), not `rsvg-convert` — no
-working SVG rasterizer has been available in any sandbox session on this
-project so far. If one ever is, prefer regenerating from the SVG source
-the normal way; keep the two in sync by hand until then.
+Note: `img/system-overview.png` and `img/storage-overview.png` are
+generated with `scripts/render-system-bg.py`/`render-storage-bg.py` (plain
+PIL), not `rsvg-convert` — no working SVG rasterizer has been available in
+any sandbox session on this project so far. If one ever is, prefer
+regenerating from the SVG source the normal way; keep the two in sync by
+hand until then.

@@ -68,10 +68,16 @@ and image lookup:
 
 ```sh
 asterctl \
+  --device /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00 \
   --config /mnt/tank/apps/aoostar-dashboard/monitor.json \
   --config-dir /mnt/tank/apps/aoostar-dashboard \
   --sensor-path /mnt/tank/apps/aoostar-dashboard/sensors/dashboard.txt
 ```
+
+`--device` pins asterctl to the WTR MAX's onboard LCD by its stable `/dev/serial/by-id/`
+symlink rather than a raw `/dev/ttyACMn` path (device numbering isn't exclusive to this
+device and shifts depending on what else is plugged in). See the "USB-serial device
+scoping" section below for why this matters.
 
 Schedule the sensor script every 5 seconds (cron, a small service, or a
 TrueNAS post-init task). `asterctl` can refresh the current page every second;
@@ -149,6 +155,26 @@ fresh every boot):
 Post Init runs after the pool is imported and the network is up, which is
 required since the units depend on `/mnt/tank/...` being mounted and (for
 later pages) Docker being available.
+
+### USB-serial device scoping
+
+`asterctl` defaults to opening *any* serial device that matches its `--usb`
+VID:PID filter (`416:90A1` — AOOSTAR's LCD, by default), but if that specific
+device isn't found it's been observed opportunistically claiming other
+`/dev/ttyACM*`/`/dev/ttyUSB*` devices instead — which is a problem on a box
+where other USB-serial gear (e.g. an ESP32 dev board for an unrelated
+project) may be plugged in at the same time. Confirmed 2026-08-06: it grabbed
+an ESP32-S3's USB-JTAG/serial interface and blocked flashing it.
+
+`aoostar-asterctl.service`'s `ExecStart` now passes `--device
+/dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00` explicitly (`--device`
+takes priority over `--usb`) — this is the WTR MAX's onboard LCD controller
+(Synwit, VID:PID `0416:90a1`), pinned by its persistent `/dev/serial/by-id/`
+symlink rather than a raw `ttyACMn` path, so it can't drift onto whatever
+port a different device happens to enumerate at. If the LCD's USB descriptor
+ever changes (e.g. after a hardware revision), re-check the symlink name with
+`ls -la /dev/serial/by-id/` and update the unit file accordingly. See
+`MASTER_PLAN.md`'s 2026-08-06 entry for the full investigation.
 
 ## Data inputs
 

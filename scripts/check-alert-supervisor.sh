@@ -21,13 +21,40 @@
 #   is showing right now" (confirmed from its source, same finding
 #   documented elsewhere in this project), so entering/exiting alert mode
 #   means editing monitor.json's top-level "mianban" array and restarting
-#   asterctl -- normal rotation [1,2,3] becomes [1,4,2,4,3,4] (alert
-#   interleaved with every normal page, panel 4 = the new alert-only
-#   panel), and back. That restart is ONLY needed for the two transitions
-#   (entering/leaving alert mode) -- while already active, the list
-#   content updates live every cycle like any other sensor field, no
-#   restart needed, since only the page STRUCTURE (which panels exist in
-#   the rotation) requires one, not their text content.
+#   asterctl -- normal rotation [1,2,3] becomes [1,4,2,4,3,4] (alert panel
+#   interleaved after every normal page), and back. That restart is ONLY
+#   needed for the two transitions (entering/leaving alert mode) -- while
+#   already active, the list content updates live every cycle like any
+#   other sensor field, no restart needed, since only the page STRUCTURE
+#   (which panels exist in the rotation) requires one, not their text
+#   content.
+#
+# - **IMPORTANT -- these mianban values only work correctly on the CUSTOM-
+#   PATCHED /root/aoostar/asterctl binary, not the stock vendor release.**
+#   Found 2026-08-06: upstream asterctl 0.2.0 has a bug in
+#   crates/asterctl/src/cfg.rs, get_next_active_panel() -- its rotation
+#   wraparound check compares against the TOTAL number of defined panels
+#   (diy.len(), i.e. panels.len()) instead of the actual length of
+#   `mianban`. A mianban shorter than diy.len() crashes ("Error: No active
+#   panel", systemd Restart=always crash loop every ~30s -- this was live
+#   for about a week, since the alert panel was added on 2026-07-31, before
+#   being noticed); a mianban longer than diy.len() silently truncates,
+#   making entries past position diy.len() permanently unreachable (the
+#   original "1 4 2 4 3 4" only ever showed its first 4 slots, so
+#   storage-overview and the second alert slot never displayed, the whole
+#   time this feature existed). Patched by changing the wraparound
+#   comparison to use the count of `mianban`'s own non-zero entries
+#   instead. Built from the exact v0.2.0 tag (matching what was already
+#   deployed, so no other behavior drift) with this one function changed;
+#   verified against the real LCD hardware before deploying -- both
+#   `[1,2,3]` (clean repeating rotation, no crash across multiple laps) and
+#   `[1,4,2,4,3,4]` (correct every-other alert interleaving, all 3 real
+#   pages actually appear) confirmed working live. Binary + patch source
+#   kept in this repo's `bin/` directory.
+#   **If asterctl is ever reinstalled/upgraded from upstream, this bug
+#   returns and mianban needs to go back to the length-matching workaround
+#   values documented in this file's git history (2026-08-06 commits) --
+#   or the patch needs reapplying to whatever new version is installed.**
 set -euo pipefail
 
 DASHBOARD_DIR="${DASHBOARD_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"

@@ -5,6 +5,7 @@ After=local-fs.target
 [Service]
 Type=simple
 ExecStart=/root/aoostar/asterctl \
+  --device /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00 \
   --config /mnt/tank/apps/aoostar-dashboard/monitor.json \
   --config-dir /mnt/tank/apps/aoostar-dashboard \
   --font-dir /mnt/tank/apps/aoostar-dashboard/fonts \

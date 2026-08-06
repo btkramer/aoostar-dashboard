@@ -1,0 +1,72 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 466178e..e33976d 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -847,26 +847,6 @@ version = "0.2.15"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
+ 
+-[[package]]
+-name = "libudev"
+-version = "0.3.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "78b324152da65df7bb95acfcaab55e3097ceaab02fb19b228a9eb74d55f135e0"
+-dependencies = [
+- "libc",
+- "libudev-sys",
+-]
+-
+-[[package]]
+-name = "libudev-sys"
+-version = "0.1.4"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "3c8469b4a23b962c1396b9b451dda50ef5b283e8dd309d69033475fa9b334324"
+-dependencies = [
+- "libc",
+- "pkg-config",
+-]
+-
+ [[package]]
+ name = "linux-raw-sys"
+ version = "0.9.4"
+@@ -1598,7 +1578,6 @@ dependencies = [
+  "core-foundation",
+  "core-foundation-sys",
+  "io-kit-sys",
+- "libudev",
+  "mach2",
+  "nix",
+  "scopeguard",
+diff --git a/crates/asterctl-lcd/Cargo.toml b/crates/asterctl-lcd/Cargo.toml
+index b7d140b..8f5b7e8 100644
+--- a/crates/asterctl-lcd/Cargo.toml
++++ b/crates/asterctl-lcd/Cargo.toml
+@@ -15,4 +15,4 @@ bytes = "1.10.1"
+ # TODO make image an optional feature
+ image = "0.25.6"
+ log = "0.4.27"
+-serialport = "4.7.3"
++serialport = { version = "4.7.3", default-features = false }
+diff --git a/crates/asterctl/src/cfg.rs b/crates/asterctl/src/cfg.rs
+index fe8c9ab..a1446aa 100644
+--- a/crates/asterctl/src/cfg.rs
++++ b/crates/asterctl/src/cfg.rs
+@@ -122,8 +122,17 @@ pub struct MonitorConfig {
+ 
+ impl MonitorConfig {
+     pub fn get_next_active_panel(&mut self) -> Option<&Panel> {
++        // Wraparound must be based on how many entries are actually in the
++        // active rotation list (`mianban` / `active_panels`), not on the
++        // total number of *defined* panels (`panels.len()`, i.e. `diy`).
++        // The original code compared against `panels.len()`, which is wrong
++        // whenever the active list is shorter (advances past the last real
++        // entry with no match -> returns None -> caller treats it as fatal)
++        // or longer (resets before ever reaching entries past `panels.len()`
++        // -> silently unreachable/dead entries) than the total panel count.
++        let active_count = self.active_panels.iter().filter(|&&active| active > 0).count();
+         let mut active_panel_idx = self.active_panel_idx.unwrap_or(0) + 1;
+-        if active_panel_idx > self.panels.len() {
++        if active_panel_idx > active_count {
+             active_panel_idx = 1;
+         }
+ 

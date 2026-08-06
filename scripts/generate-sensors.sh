@@ -257,7 +257,7 @@ gpu_temperature_over: $gpu_temperature_over
 network_rx: $(human_bytes "$rx_rate" 0)/s
 network_tx: $(human_bytes "$tx_rate" 0)/s
 ip_address: $ip_address
-date_time: $(date '+%b %d  %I:%M %p')
+date_time: $(date '+%^b %d  %I:%M %p')
 uptime_display: $uptime_display
 active_connections: $active_connections
 EOF

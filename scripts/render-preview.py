@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """Renders a monitor.json panel + a sensor value file to a PNG, approximating
 how asterctl draws it live on the LCD. This is a layout preview, not a
-verified-pixel-identical screenshot -- asterctl's exact text baseline/anchor
-convention was never confirmed against the physical device, only tuned by
-eye on it across many rounds. Useful for illustrating design decisions
-without physical device access.
+verified-pixel-identical screenshot.
+
+CONFIRMED WRONG for vertical (y) placement (2026-08-15): this script draws
+text at `y - fontSize`, treating sensor.y as a rough baseline. Real
+asterctl does not do this -- see tools/pixel-probe/README.md for the
+actual formula (found by reading asterctl's own source), which places ink
+noticeably lower than this script assumes. A layout that looks
+clean here can still overlap on the real device (this happened, on the
+Storage panel's stat rows -- see MASTER_PLAN.md's 2026-08-15 3rd-pass
+entry). Use tools/pixel-probe for any spacing decision that actually
+matters; treat this script's output as rough visual composition only
+(are things roughly where I meant them, not do they clear each other).
 
 Usage: render-preview.py <panel-index-0-based> <sensor-file> <output-png> [label=value ...]
 Trailing label=value args override/add values not present in the sensor file

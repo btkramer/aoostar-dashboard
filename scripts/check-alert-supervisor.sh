@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Alert-interrupt supervisor (added 2026-07-31). Runs at the end of every
-# ~5s cycle of aoostar-sensors.service, after generate-sensors.sh,
+# ~1s cycle of aoostar-sensors.service, after generate-sensors.sh,
 # generate-container-sensors.sh, and generate-storage-sensors.sh have all
 # written fresh data this same cycle -- deliberately reads THEIR already-
 # computed, already-formatted output (footer_text_bad/warn, diskN_health_bad,
@@ -14,9 +14,13 @@
 # - Content: a LIST of every currently active condition (not just the
 #   worst), most severe first, capped at 6 lines with "+N more" beyond
 #   that -- same truncation convention containers_detail already uses.
-# - Debounce: a condition set must be non-empty (or empty) for 2
-#   consecutive cycles (~10s) before the alert page is added to/removed
-#   from rotation -- avoids flapping the display on a single noisy read.
+# - Debounce: a condition set must be non-empty (or empty) for
+#   DEBOUNCE_CYCLES consecutive cycles (~10s at the current 1s loop
+#   interval -- was 2 cycles/~10s back when the loop ran every 5s;
+#   DEBOUNCE_CYCLES scales with the loop interval to hold the same real
+#   debounce *time*, not the same cycle *count*) before the alert page is
+#   added to/removed from rotation -- avoids flapping the display on a
+#   single noisy read.
 # - Mechanism: asterctl has no hot-reload and no query API for "what page
 #   is showing right now" (confirmed from its source, same finding
 #   documented elsewhere in this project), so entering/exiting alert mode
@@ -58,11 +62,13 @@
 set -euo pipefail
 
 DASHBOARD_DIR="${DASHBOARD_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
-OUT_DIR="$DASHBOARD_DIR/sensors"
+# SENSOR_DIR overrides where sensor/state files are written -- see the note
+# in generate-sensors.sh.
+OUT_DIR="${SENSOR_DIR:-$DASHBOARD_DIR/sensors}"
 OUT_FILE="$OUT_DIR/alert.txt"
 STATE_FILE="$OUT_DIR/.alert-state"
 MONITOR_JSON="$DASHBOARD_DIR/monitor.json"
-DEBOUNCE_CYCLES="${ALERT_DEBOUNCE_CYCLES:-2}"
+DEBOUNCE_CYCLES="${ALERT_DEBOUNCE_CYCLES:-10}"
 MAX_LINES=6
 
 mkdir -p "$OUT_DIR"
@@ -95,11 +101,32 @@ for i in 1 2 3 4 5; do
     lines+=("${dname:-disk$i}: $hbad")
   fi
 done
+for i in 1 2 3 4; do
+  nhbad="$(sensor_val "$storage_txt" "nvme_disk${i}_health_bad")"
+  if [ -n "$nhbad" ]; then
+    ndname="$(sensor_val "$storage_txt" "nvme_disk${i}_name")"
+    lines+=("${ndname:-NVMe$i}: $nhbad")
+  fi
+done
 
 # 3. Pool degraded (tier 1 -- redundancy lost but still serving, or a
-# scrub found errors on an otherwise-online pool).
+# scrub found errors on an otherwise-online pool, or nvme-pool is the
+# worse-off of the two pools -- see generate-storage-sensors.sh's shared
+# footer tier calc, which already picks the right word for whichever pool
+# is responsible).
 pool_warn="$(sensor_val "$storage_txt" footer_text_warn)"
 [ -n "$pool_warn" ] && lines+=("Pool: $pool_warn")
+
+# 3b. Boot-pool nearly full (2026-08-15) -- alert-only, no visible tile on
+# any page (see generate-storage-sensors.sh's bootpool_percent comment for
+# why). 85% is a starting-to-matter line for a pool that's normally
+# small and static; tune via env var if this box's boot-pool runs fuller
+# than that under normal operation.
+BOOTPOOL_FULL_PCT="${BOOTPOOL_FULL_PCT:-85}"
+bp_pct="$(sensor_val "$storage_txt" bootpool_percent)"
+if [ -n "$bp_pct" ] && [ "$bp_pct" -ge "$BOOTPOOL_FULL_PCT" ] 2>/dev/null; then
+  lines+=("Boot drive: ${bp_pct}% full")
+fi
 
 # 4/5. CPU/GPU over temp threshold (generate-sensors.sh's own
 # CPU_TEMP_HIGH_F/GPU_TEMP_HIGH_F-driven fields).
@@ -109,13 +136,21 @@ gpu_over="$(sensor_val "$dashboard_txt" gpu_temperature_over)"
 [ -n "$gpu_over" ] && lines+=("GPU: $gpu_over")
 
 # 6. Per-disk over-temp (uncapped -- every disk past the line, not just
-# the hottest one; DISK_TEMP_HIGH_F-driven fields from
-# generate-storage-sensors.sh).
+# the hottest one; DISK_TEMP_HIGH_F/NVME_TEMP_HIGH_F-driven fields from
+# generate-storage-sensors.sh -- two different thresholds, NVMe idles
+# hotter than spinning disks, see that script's comment).
 for i in 1 2 3 4 5; do
   tover="$(sensor_val "$storage_txt" "disk${i}_temp_over")"
   if [ -n "$tover" ]; then
     dname="$(sensor_val "$storage_txt" "disk${i}_name")"
     lines+=("${dname:-disk$i}: $tover")
+  fi
+done
+for i in 1 2 3 4; do
+  ntover="$(sensor_val "$storage_txt" "nvme_disk${i}_temp_over")"
+  if [ -n "$ntover" ]; then
+    ndname="$(sensor_val "$storage_txt" "nvme_disk${i}_name")"
+    lines+=("${ndname:-NVMe$i}: $ntover")
   fi
 done
 

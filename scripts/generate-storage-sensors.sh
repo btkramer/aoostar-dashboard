@@ -32,6 +32,21 @@ mkdir -p "$OUT_DIR"
 # KB is the smallest unit shown -- same reasoning as generate-sensors.sh's
 # copy of this function.
 human_bytes() { awk -v b="${1:-0}" -v p="${2:-2}" 'BEGIN { split("B KB MB GB TB",u," "); i=2; b/=1024; while (b>=1024 && i<5) {b/=1024;i++} printf "%.*f %s",p,b,u[i] }'; }
+# For a used/total PAIR: human_bytes() picks each number's own best-fit
+# unit independently, so "used/total" text built by stripping used_fmt's
+# unit and keeping total_fmt's silently mislabels used whenever they land
+# in different magnitude buckets (found live 2026-08-16: nvme-pool at
+# 158G/1.84T rendered as "158.1/1.3 TB" -- 158.1 is actually GB). This
+# scales BOTH numbers by total's unit instead, so they're always
+# expressed in the same one.
+human_bytes_pair() {
+  awk -v used="${1:-0}" -v total="${2:-0}" -v p="${3:-1}" 'BEGIN {
+    split("B KB MB GB TB", u, " "); i = 2; total /= 1024
+    while (total >= 1024 && i < 5) { total /= 1024; i++ }
+    divisor = 1024 ^ (i - 1)
+    printf "%.*f/%.*f %s", p, used / divisor, p, total, u[i]
+  }'
+}
 
 # ---- NVME (nvme-pool) capacity -- same used/avail-not-alloc/size
 # reasoning as tank's pool_usage/pool_detail in generate-sensors.sh.
@@ -43,9 +58,7 @@ if [ -z "${NVME_USED:-}" ] || [ -z "${NVME_TOTAL:-}" ]; then
   NVME_TOTAL="${NVME_TOTAL:-$(( ${nvme_zfs_used:-0} + ${nvme_zfs_avail:-0} ))}"
 fi
 nvme_percent=$(awk -v u="$NVME_USED" -v t="$NVME_TOTAL" 'BEGIN { if(t>0) printf "%.0f",100*u/t; else print 0 }')
-nvme_used_fmt="$(human_bytes "$NVME_USED" 1)"
-nvme_total_fmt="$(human_bytes "$NVME_TOTAL" 1)"
-nvme_detail="${nvme_used_fmt% *}/${nvme_total_fmt}"
+nvme_detail="$(human_bytes_pair "$NVME_USED" "$NVME_TOTAL" 1)"
 
 # ---- boot-pool fill % -- alert-only (2026-08-15), no visible tile on any
 # page. Small, rarely-changing OS/system drive -- not worth a permanent

@@ -44,6 +44,21 @@ mkdir -p "$OUT_DIR"
 # /1024) -- raw bytes ("512 B") aren't useful at this dashboard's scale and
 # read as noise next to the KB/MB/GB/TB values everywhere else.
 human_bytes() { awk -v b="${1:-0}" -v p="${2:-2}" 'BEGIN { split("B KB MB GB TB",u," "); i=2; b/=1024; while (b>=1024 && i<5) {b/=1024;i++} printf "%.*f %s",p,b,u[i] }'; }
+# For a used/total PAIR: human_bytes() picks each number's own best-fit
+# unit independently, so "used/total" text built by stripping used_fmt's
+# unit and keeping total_fmt's silently mislabels used whenever they land
+# in different magnitude buckets (found live 2026-08-16 on nvme-pool, same
+# latent bug here -- see generate-storage-sensors.sh's copy of this
+# function for the concrete example). Scales BOTH numbers by total's unit
+# instead, so they're always expressed in the same one.
+human_bytes_pair() {
+  awk -v used="${1:-0}" -v total="${2:-0}" -v p="${3:-1}" 'BEGIN {
+    split("B KB MB GB TB", u, " "); i = 2; total /= 1024
+    while (total >= 1024 && i < 5) { total /= 1024; i++ }
+    divisor = 1024 ^ (i - 1)
+    printf "%.*f/%.*f %s", p, used / divisor, p, total, u[i]
+  }'
+}
 
 # CPU usage: read directly from /proc/stat rather than the vendor's
 # sysinfo.txt -- that file turned out to be a one-time snapshot from initial
@@ -112,9 +127,7 @@ mem_percent=$(awk -v u="$mem_used_kb" -v t="$mem_total_kb" 'BEGIN { if(t>0) prin
 # (65/293/521/749, matching Page 2's spacing), the new one (168px) does.
 # Unit dropped from the first (used) number since it's implied by the
 # second -- only the total's human_bytes call keeps its unit suffix.
-mem_used_fmt="$(human_bytes $((mem_used_kb * 1024)) 1)"
-mem_total_fmt="$(human_bytes $((mem_total_kb * 1024)) 1)"
-mem_detail="${mem_used_fmt% *}/${mem_total_fmt}"
+mem_detail="$(human_bytes_pair $((mem_used_kb * 1024)) $((mem_total_kb * 1024)) 1)"
 
 # Real usable-capacity pool usage from the root dataset (used/avail, exact
 # bytes via -p). Deliberately `zfs list`, not `zpool list` -- zpool's
@@ -130,9 +143,7 @@ if [ -z "${POOL_USED:-}" ] || [ -z "${POOL_TOTAL:-}" ]; then
 fi
 pool_percent=$(awk -v u="$POOL_USED" -v t="$POOL_TOTAL" 'BEGIN { if(t>0) printf "%.0f",100*u/t; else print 0 }')
 # Tightened format -- same reasoning as mem_detail above.
-pool_used_fmt="$(human_bytes "$POOL_USED" 1)"
-pool_total_fmt="$(human_bytes "$POOL_TOTAL" 1)"
-pool_detail="${pool_used_fmt% *}/${pool_total_fmt}"
+pool_detail="$(human_bytes_pair "$POOL_USED" "$POOL_TOTAL" 1)"
 
 rx_file="/sys/class/net/$NET_IFACE/statistics/rx_bytes"; tx_file="/sys/class/net/$NET_IFACE/statistics/tx_bytes"
 rx_now=0; tx_now=0; [ -r "$rx_file" ] && rx_now=$(<"$rx_file"); [ -r "$tx_file" ] && tx_now=$(<"$tx_file")

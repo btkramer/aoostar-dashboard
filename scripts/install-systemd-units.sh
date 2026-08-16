@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DASHBOARD_DIR="/mnt/tank/apps/aoostar-dashboard"
+DASHBOARD_DIR="/mnt/nvme-pool/apps/projects/software/aoostar-dashboard"
 UNIT_DIR="/etc/systemd/system"
 
 cp "$DASHBOARD_DIR/scripts/aoostar-asterctl.service" "$UNIT_DIR/aoostar-asterctl.service"

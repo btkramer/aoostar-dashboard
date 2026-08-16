@@ -4,7 +4,32 @@ After=local-fs.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash -c 'while true; do /mnt/tank/apps/aoostar-dashboard/scripts/generate-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/generate-container-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/generate-storage-sensors.sh; /mnt/tank/apps/aoostar-dashboard/scripts/check-alert-supervisor.sh; sleep 5; done'
+# SENSOR_DIR sends every generator script's output (sensors/*.txt and the
+# .{cpu,network,disk-io,arc,alert,container-poll}-state files) to tmpfs
+# instead of the persistent dataset -- none of it needs to survive a
+# reboot, and it was the actual source of ~17k/day unnecessary disk
+# writes (see MASTER_PLAN.md's 2026-08-14 entry). RuntimeDirectory=
+# creates /run/aoostar-dashboard before this loop's first iteration.
+# EXCEPTION: .updates-cache does NOT follow this to tmpfs (2026-08-15) --
+# generate-container-sensors.sh hardcodes it to the persistent
+# sensors/ dir regardless of SENSOR_DIR. It's written once a day (by the
+# separate aoostar-container-updates.service, not this loop) and needs to
+# survive until the next day's run; it was found silently vanishing from
+# tmpfs well within 24h with no reboot involved -- most likely systemd's
+# own periodic /run cleanup, which the OTHER files here never sit still
+# long enough to be swept by (~1s rewrite cadence) but this one does. See
+# that script's own comment and MASTER_PLAN.md's 2026-08-15 entry.
+RuntimeDirectory=aoostar-dashboard
+Environment=SENSOR_DIR=/run/aoostar-dashboard
+# scripts/sensor-loop.sh (added 2026-08-14) replaces the old inline
+# `bash -c 'while true; do ...; sleep 1; done'` -- that gave a real period of
+# ~1s + script runtime (~1.35-1.4s measured on-device), not 1s, since the
+# sleep ran after the work rather than targeting a fixed period. The
+# wrapper script times its own work and sleeps only the remainder each
+# cycle. Also sidesteps needing `%%`-escaping for `date +%s.%N` that an
+# inline ExecStart= would require (systemd parses bare `%` as its own
+# specifier syntax there).
+ExecStart=/mnt/nvme-pool/apps/projects/software/aoostar-dashboard/scripts/sensor-loop.sh
 Restart=always
 RestartSec=5
 

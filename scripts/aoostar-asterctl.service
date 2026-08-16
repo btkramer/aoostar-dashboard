@@ -4,12 +4,17 @@ After=local-fs.target
 
 [Service]
 Type=simple
+# Sensor data is fully ephemeral (regenerated every ~1s, never needs to
+# survive a reboot) -- RuntimeDirectory= creates /run/aoostar-dashboard
+# (tmpfs) before this starts, and --sensor-path points there instead of
+# the persistent dataset, so the 5s poll loop doesn't write to real disk.
+RuntimeDirectory=aoostar-dashboard
 ExecStart=/root/aoostar/asterctl \
   --device /dev/serial/by-id/usb-Synwit_USB_Virtual_COM-if00 \
-  --config /mnt/tank/apps/aoostar-dashboard/monitor.json \
-  --config-dir /mnt/tank/apps/aoostar-dashboard \
-  --font-dir /mnt/tank/apps/aoostar-dashboard/fonts \
-  --sensor-path /mnt/tank/apps/aoostar-dashboard/sensors
+  --config /mnt/nvme-pool/apps/projects/software/aoostar-dashboard/monitor.json \
+  --config-dir /mnt/nvme-pool/apps/projects/software/aoostar-dashboard \
+  --font-dir /mnt/nvme-pool/apps/projects/software/aoostar-dashboard/fonts \
+  --sensor-path /run/aoostar-dashboard
 Restart=always
 RestartSec=5
 

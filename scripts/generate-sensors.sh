@@ -3,11 +3,23 @@
 set -euo pipefail
 
 DASHBOARD_DIR="${DASHBOARD_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
-OUT_DIR="$DASHBOARD_DIR/sensors"
+# SENSOR_DIR overrides where sensor/state files are written -- production
+# units point this at tmpfs (/run/aoostar-dashboard, see the systemd units)
+# since none of this data needs to survive a reboot; defaults to the old
+# on-disk location for manual/local testing (see README.md).
+OUT_DIR="${SENSOR_DIR:-$DASHBOARD_DIR/sensors}"
 OUT_FILE="$OUT_DIR/dashboard.txt"
 NET_IFACE="${NET_IFACE:-enp101s0}"
 POOL_NAME="${POOL_NAME:-tank}"
 STATE_FILE="$OUT_DIR/.network-state"
+# Rate calcs (network here, disk I/O + ARC in generate-storage-sensors.sh)
+# average over this many real seconds, not the loop's own 1s interval -- see
+# the comment at the rx/tx rate calc below for why. Default 5 deliberately
+# matches the loop's own pre-2026-08-14 cadence (this project spent many
+# rounds tuning these specific metrics' smoothness on the physical device at
+# that 5s pace, well before today) rather than picking a new, untested
+# value now that the two are decoupled.
+RATE_WINDOW_SEC="${RATE_WINDOW_SEC:-5}"
 # High-temp red thresholds (added 2026-07-31, same "all temps everywhere"
 # request that added disk temp color-coding on Page 3 -- see
 # generate-storage-sensors.sh's DISK_TEMP_HIGH_F for that one). Silicon
@@ -37,8 +49,10 @@ human_bytes() { awk -v b="${1:-0}" -v p="${2:-2}" 'BEGIN { split("B KB MB GB TB"
 # sysinfo.txt -- that file turned out to be a one-time snapshot from initial
 # setup (Modify == Birth == 2026-05-30), never live, not a bug that needed
 # restarting anything. Percentage is a delta between this invocation and the
-# last one (persisted in CPU_STATE_FILE), averaged over the ~5s loop
-# interval -- same pattern already used below for network rx/tx, smoother
+# last one (persisted in CPU_STATE_FILE), averaged over the loop interval
+# (a pure ratio of tick deltas, not tied to any specific interval length --
+# safe at 1s just as it was at 5s) -- same pattern used below for network
+# rx/tx, smoother
 # than sampling twice within one invocation since it doesn't need an
 # artificial sleep.
 CPU_STATE_FILE="$OUT_DIR/.cpu-state"
@@ -122,13 +136,26 @@ pool_detail="${pool_used_fmt% *}/${pool_total_fmt}"
 
 rx_file="/sys/class/net/$NET_IFACE/statistics/rx_bytes"; tx_file="/sys/class/net/$NET_IFACE/statistics/tx_bytes"
 rx_now=0; tx_now=0; [ -r "$rx_file" ] && rx_now=$(<"$rx_file"); [ -r "$tx_file" ] && tx_now=$(<"$tx_file")
+# `date +%s` is whole-second resolution -- fine at RATE_WINDOW_SEC's default
+# (10s), don't shrink that window much below ~2-3s without switching to
+# sub-second timestamps, or rates will read systematically low/noisy.
+# The state file's baseline (old_time/old_rx/old_tx) only advances once
+# RATE_WINDOW_SEC has actually elapsed, not every 1s loop tick -- so the
+# rate below is a rolling average over ~RATE_WINDOW_SEC even though this
+# script (and the sensor file it writes) still runs every 1s. Keeps
+# per-second display refreshes without the zero-flicker a literal 1s window
+# would show at light/idle traffic.
 now=$(date +%s); rx_rate=0; tx_rate=0
 if [ -r "$STATE_FILE" ]; then
   read -r old_time old_rx old_tx < "$STATE_FILE" || true
   elapsed=$((now - old_time)); [ "$elapsed" -lt 1 ] && elapsed=1
   rx_rate=$(( (rx_now - old_rx) / elapsed )); tx_rate=$(( (tx_now - old_tx) / elapsed ))
+  if [ "$elapsed" -ge "$RATE_WINDOW_SEC" ]; then
+    printf '%s %s %s\n' "$now" "$rx_now" "$tx_now" > "$STATE_FILE"
+  fi
+else
+  printf '%s %s %s\n' "$now" "$rx_now" "$tx_now" > "$STATE_FILE"
 fi
-printf '%s %s %s\n' "$now" "$rx_now" "$tx_now" > "$STATE_FILE"
 ip_address=$(ip -4 -o addr show dev "$NET_IFACE" scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1); ip_address=${ip_address:-Offline}
 
 # Uptime: straight from /proc/uptime (first field, seconds since boot) --

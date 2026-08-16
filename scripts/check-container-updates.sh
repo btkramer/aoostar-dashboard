@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Daily-cadence container image update check via registry digest comparison.
-# Deliberately NOT run on the fast 5s loop -- each container costs one or two
+# Deliberately NOT run on the fast 1s loop -- each container costs one or two
 # HTTPS calls to its registry, which would risk rate limits (notably Docker
 # Hub's anonymous pull limit) if run that often. Run via systemd timer.
 #
@@ -11,12 +11,29 @@
 set -euo pipefail
 
 DASHBOARD_DIR="${DASHBOARD_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
-OUT_DIR="$DASHBOARD_DIR/sensors"
-CACHE_FILE="$OUT_DIR/.updates-cache"
+# CACHE_FILE deliberately does NOT follow SENSOR_DIR onto tmpfs (2026-08-15
+# regression fix, caught live on the box -- dashboard showing "Updates:
+# None" despite that same day's run having found 8). Unlike every other
+# sensor file (rewritten every ~1s, so tmpfs durability never matters),
+# this one is written once a day and needs to survive until the next
+# day's run. Confirmed on the real host: the file was written successfully
+# (this script's own log proved it) but vanished from /run/aoostar-dashboard
+# well within 24h with no reboot in between -- most likely systemd's own
+# periodic /run cleanup, which the OTHER files there never sit still long
+# enough to be swept by (~1s rewrite cadence) but this one does. The
+# original tmpfs migration only accounted for reboot as a loss scenario for
+# this specific file ("a brief 'no updates known' window") -- that
+# assumption didn't hold. Stays on the persistent dataset, same as
+# LOG_FILE below, unconditionally (not SENSOR_DIR-overridable, and no
+# longer using OUT_DIR/SENSOR_DIR at all -- nothing else in this script
+# needs them) so generate-container-sensors.sh's read side can't drift
+# from this write side onto two different directories.
+CACHE_DIR="$DASHBOARD_DIR/sensors"
+CACHE_FILE="$CACHE_DIR/.updates-cache"
 LOG_FILE="$DASHBOARD_DIR/logs/container-updates.log"
 ACCEPT='Accept: application/vnd.docker.distribution.manifest.v2+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.oci.image.index.v1+json'
 
-mkdir -p "$OUT_DIR" "$(dirname "$LOG_FILE")"
+mkdir -p "$CACHE_DIR" "$(dirname "$LOG_FILE")"
 # Truncated at the start of each run, not appended -- this only runs once a
 # day, so there's no need to accumulate history; last run's log is enough.
 : > "$LOG_FILE"
@@ -80,7 +97,7 @@ remote_digest() {
   printf '%s' "$digest"
 }
 
-tmp=$(mktemp "$OUT_DIR/.updates-cache.XXXXXX")
+tmp=$(mktemp "$CACHE_DIR/.updates-cache.XXXXXX")
 checked=0
 available=0
 

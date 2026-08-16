@@ -5,4 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/mnt/tank/apps/aoostar-dashboard/scripts/check-container-updates.sh
+# No RuntimeDirectory=/SENSOR_DIR here (removed 2026-08-15) -- this script's
+# only output, .updates-cache, deliberately stays on the persistent
+# sensors/ dir now, not tmpfs (see check-container-updates.sh's own
+# comment: the cache was found vanishing from /run well within a day, most
+# likely swept by systemd's own periodic /run cleanup, since it's the one
+# file here that doesn't get rewritten every ~1s like everything else
+# aoostar-sensors.service writes). Nothing in this script reads or writes
+# SENSOR_DIR anymore.
+ExecStart=/mnt/nvme-pool/apps/projects/software/aoostar-dashboard/scripts/check-container-updates.sh

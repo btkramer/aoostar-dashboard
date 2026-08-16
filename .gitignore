@@ -7,6 +7,7 @@ sensors/.cpu-state
 sensors/.disk-io-state
 sensors/.arc-state
 sensors/.alert-state
+sensors/.container-poll-state
 sensors/alert.txt
 sensors/.containers.*
 sensors/.dashboard.*

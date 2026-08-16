@@ -5,10 +5,51 @@
 set -euo pipefail
 
 DASHBOARD_DIR="${DASHBOARD_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}"
-OUT_DIR="$DASHBOARD_DIR/sensors"
+# SENSOR_DIR overrides where sensor/state files are written -- see the note
+# in generate-sensors.sh.
+OUT_DIR="${SENSOR_DIR:-$DASHBOARD_DIR/sensors}"
 OUT_FILE="$OUT_DIR/containers.txt"
-UPDATES_CACHE="$OUT_DIR/.updates-cache"
+# UPDATES_CACHE deliberately does NOT follow OUT_DIR onto tmpfs -- must
+# match check-container-updates.sh's own CACHE_DIR exactly (see that
+# script's comment for the 2026-08-15 regression this fixes: the cache
+# file was vanishing from tmpfs well within a day, most likely swept by
+# systemd's own periodic /run cleanup).
+UPDATES_CACHE="$DASHBOARD_DIR/sensors/.updates-cache"
 MAX_NAMES=3
+
+mkdir -p "$OUT_DIR" "$DASHBOARD_DIR/sensors"
+
+# Self-throttle (added 2026-08-14, when the loop sped up to 1s): the actual
+# cost here is one `docker inspect` per running/exited container, every
+# invocation -- real dockerd/CPU load, unrelated to the tmpfs sensor-write
+# change, and container running/healthy/issues counts don't realistically
+# change fast enough to need re-checking every second (they didn't really
+# need it every 5s either). Skip the docker scan entirely -- leaving
+# $OUT_FILE untouched with its last real values -- unless
+# CONTAINER_POLL_INTERVAL_SEC has actually elapsed since the last real poll.
+# Default 15, not a bigger number like 60: dockerd load drops off fast with
+# interval (46+ containers/~70 inspect calls per scan -> ~14/s sustained at
+# the original 5s cadence, ~4.7/s at 15s, ~1.2/s at 60s) but detection
+# latency for check-alert-supervisor.sh's container-crash alerts (which
+# reads this same $OUT_FILE) scales linearly with this value on top of its
+# own ~10s debounce -- 15s keeps worst-case alert latency close to what this
+# project already had pre-2026-08-14 (~15s poll + debounce), where 60s would
+# have tripled it for a load saving that's already negligible past ~15s.
+# Pool/temp/disk alerts are unaffected either way -- those come from the
+# other generator scripts, which still run every 1s. Raise this further only
+# if dockerd load is still a measured problem at 15s; lower it if container
+# crash detection ever needs to be faster than ~25s end-to-end.
+CONTAINER_POLL_INTERVAL_SEC="${CONTAINER_POLL_INTERVAL_SEC:-15}"
+POLL_STATE_FILE="$OUT_DIR/.container-poll-state"
+poll_now=$(date +%s)
+if [ -r "$POLL_STATE_FILE" ]; then
+  poll_last=$(cat "$POLL_STATE_FILE")
+  poll_elapsed=$((poll_now - poll_last))
+  if [ "$poll_elapsed" -lt "$CONTAINER_POLL_INTERVAL_SEC" ]; then
+    exit 0
+  fi
+fi
+echo "$poll_now" > "$POLL_STATE_FILE"
 # Budget for the name-list portion only, after its "Issues: "/"Updates: "
 # prefix -- measured against the real font at the layout's fontSize (36px)
 # and the text start x (81px, after the 2026-07-29 status-circle column was
@@ -29,8 +70,6 @@ MAX_NAMES=3
 # no buffer) -- don't push past 36 without the user confirming on-device
 # again, this is now past the design inset, not just the safety margin.
 MAX_CHARS=36
-
-mkdir -p "$OUT_DIR"
 
 running=0
 healthy=0

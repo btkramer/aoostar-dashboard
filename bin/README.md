@@ -3,8 +3,8 @@
 A patched build of the vendor `asterctl` binary (from
 [zehnm/aoostar-rs](https://github.com/zehnm/aoostar-rs), tag `v0.2.0` — the
 exact version already deployed on this box) that fixes a real upstream bug
-in its panel-rotation logic. Full writeup in `MASTER_PLAN.md`'s 2026-08-06
-entries; short version:
+in its panel-rotation logic (found 2026-08-06, alongside the USB-device-
+scoping fix documented in `history-2026-07.md`):
 
 `crates/asterctl/src/cfg.rs`'s `get_next_active_panel()` compares the
 rotation wraparound against `panels.len()` (total defined panels, i.e.
@@ -46,7 +46,7 @@ dropped.
 ```sh
 sudo systemctl stop aoostar-asterctl
 sudo cp /root/aoostar/asterctl /root/aoostar/asterctl.orig-0.2.0   # backup, one-time
-sudo cp /mnt/tank/apps/aoostar-dashboard/bin/asterctl-0.2.0-mianban-fix /root/aoostar/asterctl
+sudo cp /mnt/nvme-pool/apps/projects/software/aoostar-dashboard/bin/asterctl-0.2.0-mianban-fix /root/aoostar/asterctl
 sudo chmod 755 /root/aoostar/asterctl
 sudo systemctl start aoostar-asterctl
 systemctl status aoostar-asterctl

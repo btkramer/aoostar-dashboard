@@ -23,7 +23,7 @@ WHITE = (248, 250, 252)    # #f8fafc
 KICKER = (148, 163, 184)   # #94a3b8
 PAGE_LABEL = (203, 213, 225) # #cbd5e1, brighter than KICKER (page title, top right)
 LABEL = (148, 163, 184)    # #94a3b8
-DIVIDER = (58, 74, 104)    # #3a4a68
+DIVIDER = (84, 104, 142)   # #546c8e, brightened from #3a4a68 (2026-08-17)
 
 FONT_DIR = "/usr/share/fonts/truetype/dejavu"
 bold = lambda sz: ImageFont.truetype(f"{FONT_DIR}/DejaVuSans-Bold.ttf", sz)
@@ -60,9 +60,9 @@ def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False, anchor_middle
 # hazard scheme). Accent bar's y-span recomputed from the real ink bbox
 # at the new TrueNAS size (17-54, was 18-53) so it still exactly brackets
 # the text.
-d.rounded_rectangle((24, 17, 24 + 7, 17 + 37), radius=2, fill=ACCENT)
-draw_spaced((42, 53), "TrueNAS", bold(48), WHITE, spacing=1)
-draw_spaced((910, 40), "CONTAINER OVERVIEW", reg(34), PAGE_LABEL, spacing=2, anchor_end=True)
+d.rounded_rectangle((24, 14, 24 + 7, 14 + 40), radius=2, fill=ACCENT)
+draw_spaced((42, 53), "TrueNAS", bold(52), WHITE, spacing=1)
+draw_spaced((910, 50), "CONTAINER OVERVIEW", reg(34), PAGE_LABEL, spacing=2, anchor_end=True)
 d.line((24, 72, 936, 72), fill=ACCENT, width=2)
 
 # Row 1 labels + blue bars -- centered 2026-07-31 at each column's center
@@ -82,7 +82,7 @@ draw_spaced((45, 211), "STATUS", label_font, LABEL, spacing=1.5)
 # treatment across all 4 pages (alert uses its own DARK_TEXT instead),
 # see render-storage-bg.py's same-day comment for the y=339 derivation
 # (clears the lowest content on any page, ~9-10px clearance each side).
-d.line((24, 339, 936, 339), fill=ACCENT, width=2)
+d.line((24, 328, 936, 328), fill=ACCENT, width=2)
 
 # Footer: entirely live monitor.json sensor fields, nothing to draw here.
 

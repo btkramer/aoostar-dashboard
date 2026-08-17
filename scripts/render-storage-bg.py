@@ -19,7 +19,7 @@ WHITE = (248, 250, 252)    # #f8fafc
 KICKER = (148, 163, 184)   # #94a3b8 (bumped from #64748b 2026-07-29, brighter per user request)
 PAGE_LABEL = (203, 213, 225) # #cbd5e1, brighter than KICKER (page title, top right)
 LABEL = (148, 163, 184)    # #94a3b8
-DIVIDER = (58, 74, 104)    # #3a4a68
+DIVIDER = (84, 104, 142)   # #546c8e, brightened from #3a4a68 (2026-08-17)
 
 FONT_DIR = "/usr/share/fonts/truetype/dejavu"
 bold = lambda sz: ImageFont.truetype(f"{FONT_DIR}/DejaVuSans-Bold.ttf", sz)
@@ -65,9 +65,9 @@ def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False, anchor_middle
 # render-system-bg.py/render-container-bg.py so all three main pages
 # match (NOT render-alert-bg.py, which deliberately keeps its own
 # inverted red/amber hazard scheme, never blue).
-d.rounded_rectangle((24, 17, 24 + 7, 17 + 37), radius=2, fill=ACCENT)
-draw_spaced((42, 53), "TrueNAS", bold(48), WHITE, spacing=1)
-draw_spaced((910, 40), "STORAGE OVERVIEW", reg(34), PAGE_LABEL, spacing=2, anchor_end=True)
+d.rounded_rectangle((24, 14, 24 + 7, 14 + 40), radius=2, fill=ACCENT)
+draw_spaced((42, 53), "TrueNAS", bold(52), WHITE, spacing=1)
+draw_spaced((910, 50), "STORAGE OVERVIEW", reg(34), PAGE_LABEL, spacing=2, anchor_end=True)
 d.line((24, 72, 936, 72), fill=ACCENT, width=2)
 
 # Rows reworked 2026-08-15 into one row per pool (TANK, NVME) instead of 4
@@ -157,11 +157,17 @@ d.line((24, 72, 936, 72), fill=ACCENT, width=2)
 # of y). The real constraint is the header's own column vs the CAPACITY%/
 # READ/WRITE values below it in that SAME x -- ~13px real clearance to
 # those at the new position, still comfortable.
-row_label_font = bold(32)
+# 21st pass (2026-08-17): TANK/NVME band tightened further (divider-to-
+# divider 72->55) and the whole block moved up (header 108->100) to free
+# more room for the disk-temp grid + footer gap below -- same proportional
+# scaling method as the 10th pass, re-verified with tools/pixel-probe
+# (tightest new junction: bar-to-divider, 3px, matching this page's
+# existing proven-safe pattern).
+row_label_font = bold(25)
 col_header_font = bold(26)
 COL_X = {"CAPACITY": 320, "READ": 560, "WRITE": 810}
 BAR_HALF_WIDTH = 70
-HEADER_Y = 108
+HEADER_Y = 100
 
 for text, x in COL_X.items():
     draw_spaced((x, HEADER_Y), text, col_header_font, LABEL, spacing=1.5, anchor_middle=True)
@@ -174,8 +180,8 @@ for text, x in COL_X.items():
 # 17th pass (2026-08-17): "slightly too much" -- nudged back up 3px
 # (131/203). Clearance to the detail text below grows to 9px.
 for row_label, label_y, bar_y, divider_y in (
-    ("TANK", 131, 163, 169),
-    ("NVME", 203, 235, 241),
+    ("TANK", 126, 149, 155),
+    ("NVME", 181, 204, 210),
 ):
     draw_spaced((40, label_y), row_label, row_label_font, WHITE, spacing=1)
     for x in COL_X.values():
@@ -239,8 +245,8 @@ for row_label, label_y, bar_y, divider_y in (
 TICK_HALF_HEIGHT = 16
 TICK_WIDTH = 5
 for row_y, disk_name_xs in (
-    (271, [82, 250, 418, 586, 754]),   # tank: disk1..5_name
-    (314, [40, 262, 484, 706]),        # nvme: nvme_disk1..4_name
+    (250, [82, 250, 418, 586, 754]),   # tank: disk1..5_name
+    (303, [40, 262, 484, 706]),        # nvme: nvme_disk1..4_name
 ):
     for name_x in disk_name_xs:
         tick_x = name_x - 7
@@ -252,7 +258,7 @@ for row_y, disk_name_xs in (
 # between the two rows' worst-case ink (row1 bottom 284.67, row2 top 301
 # at fontSize 30/26 -- verified with tools/pixel-probe), giving ~8px
 # clearance to each row, matching this page's other divider junctions.
-d.line((24, 293, 936, 293), fill=DIVIDER, width=2)
+d.line((24, 277, 936, 277), fill=DIVIDER, width=2)
 
 # 20th pass (2026-08-17): divider above the footer row, ACCENT (blue,
 # matching the rest of this page's lines) -- same treatment applied to
@@ -263,7 +269,7 @@ d.line((24, 293, 936, 293), fill=DIVIDER, width=2)
 # this page's own nvme temp row, ink bottom 327.67) by ~10px, with ~9px
 # to the footer's own topmost ink (348.33) -- verified with
 # tools/pixel-probe against each page's worst-case content.
-d.line((24, 339, 936, 339), fill=ACCENT, width=2)
+d.line((24, 328, 936, 328), fill=ACCENT, width=2)
 
 # Footer: entirely live monitor.json sensor fields -- status dot+text
 # (left), date_time (center), ip_address (right). Nothing left to draw

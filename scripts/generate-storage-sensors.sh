@@ -309,23 +309,24 @@ nvme_scrub_tier=0
 [ -n "$nvme_scrub_bad_text" ] && nvme_scrub_tier=1
 
 # Overall tier is the worst of: tank state, tank scrub errors, nvme-pool
-# state, nvme-pool scrub errors. footer_word picks whichever pool/signal is
-# actually responsible for the worst tier so the one-line footer text
-# isn't ambiguous about which pool has the problem -- tank keeps the bare
-# state word (the common case, and this field's pre-existing behavior)
-# unless something on nvme-pool is strictly worse, in which case it's
-# prefixed so it's unambiguous. Ties (e.g. both pools have scrub errors)
-# favor whichever was checked first below -- tank.
+# state, nvme-pool scrub errors. footer_word is just the bare state/signal
+# word (ONLINE/DEGRADED/FAULTED/.../ERRORS), no pool-name prefix
+# (2026-08-17: dropped "NVME " -- on-device it collided with the footer's
+# date/time text at DEGRADED length, and which pool is responsible is
+# already unambiguous from the alert-interrupt page this same tier change
+# triggers, plus which row's bar is red on this page). Ties (e.g. both
+# pools have scrub errors) favor whichever was checked first below --
+# tank.
 tier=$state_tier
 footer_word="$pool_state"
 [ "$scrub_tier" -gt "$tier" ] && { tier=$scrub_tier; footer_word="ERRORS"; }
 if [ "$nvme_state_tier" -gt "$tier" ]; then
   tier=$nvme_state_tier
-  footer_word="NVME $nvme_pool_state"
+  footer_word="$nvme_pool_state"
 fi
 if [ "$nvme_scrub_tier" -gt "$tier" ]; then
   tier=$nvme_scrub_tier
-  footer_word="NVME ERRORS"
+  footer_word="ERRORS"
 fi
 
 dot='●'

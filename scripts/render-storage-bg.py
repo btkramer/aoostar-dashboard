@@ -197,18 +197,22 @@ for row_label, label_y, bar_y, divider_y in (
 # row still fits the page width.
 #
 # 13th pass (2026-08-17): "still too thin" -- widened 3px->5px, growing
-# the reserved post-dot zone from 4+3+4=11 to 4+5+4=13 (monitor.json's
-# disk*_temp_*/dot_* x's shifted accordingly, name/temp/dot clearance
-# still 6px each junction, rows still fit the page width with 21-27px to
-# spare).
+# the reserved post-dot zone from 4+3+4=11 to 4+5+4=13.
+#
+# 14th pass (2026-08-17): "still too thin" -- widened 5px->10px (zone
+# 4+10+4=18). At this width the name-temp/temp-dot pads within each disk
+# also had to shrink 6->4 to keep the row inside the page (still
+# positive, matches other verified-safe junctions elsewhere in this
+# layout) -- monitor.json's disk*_temp_*/dot_* x's shifted accordingly,
+# rows still fit the page width with 22-27px to spare.
 TICK_HALF_HEIGHT = 16
-TICK_WIDTH = 5
+TICK_WIDTH = 10
 for row_y, disk_name_xs in (
-    (271, [82, 250, 418, 586, 754]),   # tank: disk1..5_name
-    (316, [40, 262, 484, 706]),        # nvme: nvme_disk1..4_name
+    (271, [82, 251, 420, 589, 758]),   # tank: disk1..5_name
+    (316, [40, 263, 486, 709]),        # nvme: nvme_disk1..4_name
 ):
     for name_x in disk_name_xs:
-        tick_x = name_x - 7
+        tick_x = name_x - 9
         d.line((tick_x, row_y - TICK_HALF_HEIGHT, tick_x, row_y + TICK_HALF_HEIGHT), fill=DIVIDER, width=TICK_WIDTH)
 
 # Footer: entirely live monitor.json sensor fields -- status dot+text

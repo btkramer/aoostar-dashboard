@@ -212,14 +212,18 @@ for row_label, label_y, bar_y, divider_y in (
 # pass. Switched to ACCENT (#38bdf8), the bright blue already used for
 # the header bar and the CAPACITY/READ/WRITE underline bars, so it reads
 # as the same "blue line" language as the rest of the page.
+#
+# 16th pass (2026-08-17): with the right color visible, 10px read as too
+# thick -- back to 5px (zone 4+5+4=13, name-temp/temp-dot pads restored
+# 4->6 since the wider 10px zone no longer needs the extra room).
 TICK_HALF_HEIGHT = 16
-TICK_WIDTH = 10
+TICK_WIDTH = 5
 for row_y, disk_name_xs in (
-    (271, [82, 251, 420, 589, 758]),   # tank: disk1..5_name
-    (316, [40, 263, 486, 709]),        # nvme: nvme_disk1..4_name
+    (271, [82, 250, 418, 586, 754]),   # tank: disk1..5_name
+    (316, [40, 262, 484, 706]),        # nvme: nvme_disk1..4_name
 ):
     for name_x in disk_name_xs:
-        tick_x = name_x - 9
+        tick_x = name_x - 7
         d.line((tick_x, row_y - TICK_HALF_HEIGHT, tick_x, row_y + TICK_HALF_HEIGHT), fill=ACCENT, width=TICK_WIDTH)
 
 # Footer: entirely live monitor.json sensor fields -- status dot+text

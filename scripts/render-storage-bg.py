@@ -191,19 +191,24 @@ for row_label, label_y, bar_y, divider_y in (
 # (N-1)'s health dot (e.g. disk2's tick at x=235 sat inside disk1's dot
 # ink span of 220-241), so asterctl drew the dot glyph right over it.
 # monitor.json's disk*_dot_*/temp_* x's were re-derived this pass with a
-# dedicated post-dot gap (4px clearance, 3px tick, 4px clearance) instead
-# of assuming leftover space would happen to be tick-sized -- verified
-# with tools/pixel-probe that name/temp/dot still clear each other (6px
-# each junction) and the row still fits the page width (27-35px spare).
-# Line width also bumped 2->3 ("increase the thickness").
+# dedicated post-dot gap sized for the tick instead of assuming leftover
+# space would happen to be tick-sized -- verified with tools/pixel-probe
+# that name/temp/dot still clear each other (6px each junction) and the
+# row still fits the page width.
+#
+# 13th pass (2026-08-17): "still too thin" -- widened 3px->5px, growing
+# the reserved post-dot zone from 4+3+4=11 to 4+5+4=13 (monitor.json's
+# disk*_temp_*/dot_* x's shifted accordingly, name/temp/dot clearance
+# still 6px each junction, rows still fit the page width with 21-27px to
+# spare).
 TICK_HALF_HEIGHT = 16
-TICK_WIDTH = 3
+TICK_WIDTH = 5
 for row_y, disk_name_xs in (
-    (271, [82, 248, 414, 580, 746]),   # tank: disk1..5_name
-    (316, [40, 260, 480, 700]),        # nvme: nvme_disk1..4_name
+    (271, [82, 250, 418, 586, 754]),   # tank: disk1..5_name
+    (316, [40, 262, 484, 706]),        # nvme: nvme_disk1..4_name
 ):
     for name_x in disk_name_xs:
-        tick_x = name_x - 6
+        tick_x = name_x - 7
         d.line((tick_x, row_y - TICK_HALF_HEIGHT, tick_x, row_y + TICK_HALF_HEIGHT), fill=DIVIDER, width=TICK_WIDTH)
 
 # Footer: entirely live monitor.json sensor fields -- status dot+text

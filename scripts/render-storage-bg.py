@@ -138,11 +138,20 @@ d.line((24, 72, 936, 72), fill=DIVIDER, width=2)
 # (this file's static labels/bars/dividers AND monitor.json's dynamic
 # fields) re-verified with tools/pixel-probe against real worst-case
 # text -- see its README before changing any of this again.
+#
+# 11th pass (2026-08-17): column headers moved down (97->108) and shrunk
+# (30->26). The 9th-pass comment above believed 97 was already pinned
+# against the TANK/NVME row label's clearance -- re-checked this pass and
+# that was never a real constraint (the row label sits at x=40, headers at
+# x=320/560/810, horizontally disjoint, can't visually collide regardless
+# of y). The real constraint is the header's own column vs the CAPACITY%/
+# READ/WRITE values below it in that SAME x -- ~13px real clearance to
+# those at the new position, still comfortable.
 row_label_font = bold(32)
-col_header_font = bold(30)
+col_header_font = bold(26)
 COL_X = {"CAPACITY": 320, "READ": 560, "WRITE": 810}
 BAR_HALF_WIDTH = 70
-HEADER_Y = 97
+HEADER_Y = 108
 
 for text, x in COL_X.items():
     draw_spaced((x, HEADER_Y), text, col_header_font, LABEL, spacing=1.5, anchor_middle=True)
@@ -169,6 +178,21 @@ for row_label, label_y, bar_y, divider_y in (
 # fields, not health_ok/health_bad -- those are still written to
 # storage.txt for check-alert-supervisor.sh's alert-line text, just no
 # longer drawn on this page).
+#
+# 11th pass (2026-08-17): a thin vertical tick before each disk ("break
+# them up visually" -- 5-6 adjacent name/temp/dot groups otherwise read as
+# one dense run of text). Purely decorative/static, so drawn here rather
+# than as a monitor.json field -- these x's are the disk*_name /
+# nvme_disk*_name x's from monitor.json minus a small gap, and must be
+# kept in sync by hand if those ever move.
+TICK_HALF_HEIGHT = 16
+for row_y, disk_name_xs in (
+    (271, [82, 249, 416, 583, 750]),   # tank: disk1..5_name
+    (316, [48, 269, 490, 711]),        # nvme: nvme_disk1..4_name
+):
+    for name_x in disk_name_xs:
+        tick_x = name_x - 14
+        d.line((tick_x, row_y - TICK_HALF_HEIGHT, tick_x, row_y + TICK_HALF_HEIGHT), fill=DIVIDER, width=2)
 
 # Footer: entirely live monitor.json sensor fields -- status dot+text
 # (left), date_time (center), ip_address (right). Nothing left to draw

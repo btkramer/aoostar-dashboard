@@ -59,10 +59,16 @@ def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False, anchor_middle
 # exact since this is a static draw_spaced call, not an asterctl dynamic
 # field) rather than left at its old height, so it still exactly brackets
 # the (now taller) text as asked.
+#
+# 20th pass (2026-08-17): page-title font 30->34, and the divider below
+# the header row DIVIDER(gray)->ACCENT(blue) -- same treatment applied to
+# render-system-bg.py/render-container-bg.py so all three main pages
+# match (NOT render-alert-bg.py, which deliberately keeps its own
+# inverted red/amber hazard scheme, never blue).
 d.rounded_rectangle((24, 17, 24 + 7, 17 + 37), radius=2, fill=ACCENT)
 draw_spaced((42, 53), "TrueNAS", bold(48), WHITE, spacing=1)
-draw_spaced((910, 40), "STORAGE OVERVIEW", reg(30), PAGE_LABEL, spacing=2, anchor_end=True)
-d.line((24, 72, 936, 72), fill=DIVIDER, width=2)
+draw_spaced((910, 40), "STORAGE OVERVIEW", reg(34), PAGE_LABEL, spacing=2, anchor_end=True)
+d.line((24, 72, 936, 72), fill=ACCENT, width=2)
 
 # Rows reworked 2026-08-15 into one row per pool (TANK, NVME) instead of 4
 # single-stat columns -- nvme-pool is now a real 4-drive raidz1, not just
@@ -247,6 +253,17 @@ for row_y, disk_name_xs in (
 # at fontSize 30/26 -- verified with tools/pixel-probe), giving ~8px
 # clearance to each row, matching this page's other divider junctions.
 d.line((24, 293, 936, 293), fill=DIVIDER, width=2)
+
+# 20th pass (2026-08-17): divider above the footer row, ACCENT (blue,
+# matching the rest of this page's lines) -- same treatment applied to
+# render-system-bg.py/render-container-bg.py/render-alert-bg.py (alert
+# uses its own DARK_TEXT instead of blue, matching its inverted scheme)
+# so it shows up on every page's footer, not just this one. y=339 clears
+# the lowest non-footer content on ANY of the 4 pages (worst case here:
+# this page's own nvme temp row, ink bottom 327.67) by ~10px, with ~9px
+# to the footer's own topmost ink (348.33) -- verified with
+# tools/pixel-probe against each page's worst-case content.
+d.line((24, 339, 936, 339), fill=ACCENT, width=2)
 
 # Footer: entirely live monitor.json sensor fields -- status dot+text
 # (left), date_time (center), ip_address (right). Nothing left to draw

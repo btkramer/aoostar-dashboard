@@ -51,11 +51,17 @@ def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False, anchor_middle
         cx += w + spacing
 
 
-# Header
-d.rounded_rectangle((24, 18, 24 + 7, 18 + 35), radius=2, fill=ACCENT)
-draw_spaced((42, 53), "TrueNAS", bold(43), WHITE, spacing=1)
-draw_spaced((910, 40), "SYSTEM OVERVIEW", reg(30), PAGE_LABEL, spacing=2, anchor_end=True)
-d.line((24, 72, 936, 72), fill=DIVIDER, width=2)
+# Header. TrueNAS label 43->48pt, page-title 30->34, header divider
+# DIVIDER(gray)->ACCENT(blue) (2026-08-17, matching render-storage-bg.py's
+# same-day treatment so all three main pages match -- NOT
+# render-alert-bg.py, which deliberately keeps its own inverted red/amber
+# hazard scheme). Accent bar's y-span recomputed from the real ink bbox
+# at the new TrueNAS size (17-54, was 18-53) so it still exactly brackets
+# the text.
+d.rounded_rectangle((24, 17, 24 + 7, 17 + 37), radius=2, fill=ACCENT)
+draw_spaced((42, 53), "TrueNAS", bold(48), WHITE, spacing=1)
+draw_spaced((910, 40), "SYSTEM OVERVIEW", reg(34), PAGE_LABEL, spacing=2, anchor_end=True)
+d.line((24, 72, 936, 72), fill=ACCENT, width=2)
 
 # Row 1: CPU/GPU/MEMORY/POOL (2026-07-31, GPU moved next to CPU). Row 2
 # reflowed onto the same 4-column grid. Both rows fully centered (text-
@@ -77,6 +83,12 @@ d.line((24, 216, 936, 216), fill=DIVIDER, width=2)
 row2_font = bold(24)
 for x, text in [(130, "DOWNLOAD"), (366, "UPLOAD"), (603, "CONNECTIONS"), (839, "UPTIME")]:
     draw_spaced((x, 256), text, row2_font, LABEL, spacing=1.5, anchor_middle=True)
+
+# Divider above the footer row (2026-08-17), ACCENT (blue) -- same
+# treatment across all 4 pages (alert uses its own DARK_TEXT instead),
+# see render-storage-bg.py's same-day comment for the y=339 derivation
+# (clears the lowest content on any page, ~9-10px clearance each side).
+d.line((24, 339, 936, 339), fill=ACCENT, width=2)
 
 # Footer: entirely live monitor.json sensor fields, nothing to draw here.
 

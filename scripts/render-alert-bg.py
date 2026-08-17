@@ -57,6 +57,14 @@ draw_spaced((42, 53), "TrueNAS", bold(43), DARK_TEXT, spacing=1)
 draw_spaced((910, 40), "⚠ ACTIVE ALERTS", reg(30), ALERT_ACCENT, spacing=2, anchor_end=True)
 d.line((24, 72, 936, 72), fill=DARK_TEXT, width=2)
 
+# Divider above the footer row (2026-08-17) -- same treatment added to
+# the other 3 pages' generators the same day, but this page keeps
+# DARK_TEXT instead of ACCENT-blue (deliberately never uses that color,
+# see the hazard-scheme note at the top of this file). y=339 matches the
+# other pages' derivation; alert_line6 (this page's lowest content,
+# y=310) clears it with real room to spare.
+d.line((24, 339, 936, 339), fill=DARK_TEXT, width=2)
+
 out = DASHBOARD_DIR / "img" / "alert-overview.png"
 img.save(out)
 print(f"saved {out}")

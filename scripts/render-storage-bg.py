@@ -54,9 +54,13 @@ def draw_spaced(xy, text, font, fill, spacing=0, anchor_end=False, anchor_middle
         cx += w + spacing
 
 
-# Header
-d.rounded_rectangle((24, 18, 24 + 7, 18 + 35), radius=2, fill=ACCENT)
-draw_spaced((42, 53), "TrueNAS", bold(43), WHITE, spacing=1)
+# Header. TrueNAS label bumped 43->48pt (2026-08-17); accent bar's y-span
+# recomputed from the real ink bbox at the new size (PIL font.getbbox,
+# exact since this is a static draw_spaced call, not an asterctl dynamic
+# field) rather than left at its old height, so it still exactly brackets
+# the (now taller) text as asked.
+d.rounded_rectangle((24, 17, 24 + 7, 17 + 37), radius=2, fill=ACCENT)
+draw_spaced((42, 53), "TrueNAS", bold(48), WHITE, spacing=1)
 draw_spaced((910, 40), "STORAGE OVERVIEW", reg(30), PAGE_LABEL, spacing=2, anchor_end=True)
 d.line((24, 72, 936, 72), fill=DIVIDER, width=2)
 
@@ -156,9 +160,13 @@ HEADER_Y = 108
 for text, x in COL_X.items():
     draw_spaced((x, HEADER_Y), text, col_header_font, LABEL, spacing=1.5, anchor_middle=True)
 
+# 16th pass (2026-08-17): row labels moved down 10px (134/206, was
+# 124/196) -- still 6px real clearance to the capacity-detail text below
+# each (dynamic monitor.json field, unmoved), matching other verified-safe
+# junctions in this layout.
 for row_label, label_y, bar_y, divider_y in (
-    ("TANK", 124, 163, 169),
-    ("NVME", 196, 235, 241),
+    ("TANK", 134, 163, 169),
+    ("NVME", 206, 235, 241),
 ):
     draw_spaced((40, label_y), row_label, row_label_font, WHITE, spacing=1)
     for x in COL_X.values():

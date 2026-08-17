@@ -205,6 +205,13 @@ for row_label, label_y, bar_y, divider_y in (
 # positive, matches other verified-safe junctions elsewhere in this
 # layout) -- monitor.json's disk*_temp_*/dot_* x's shifted accordingly,
 # rows still fit the page width with 22-27px to spare.
+#
+# 15th pass (2026-08-17): color was DIVIDER (the dark, muted horizontal-
+# rule color, #3a4a68) -- on-device this read as too dark to see clearly,
+# which was likely the real reason it kept getting asked to be wider each
+# pass. Switched to ACCENT (#38bdf8), the bright blue already used for
+# the header bar and the CAPACITY/READ/WRITE underline bars, so it reads
+# as the same "blue line" language as the rest of the page.
 TICK_HALF_HEIGHT = 16
 TICK_WIDTH = 10
 for row_y, disk_name_xs in (
@@ -213,7 +220,7 @@ for row_y, disk_name_xs in (
 ):
     for name_x in disk_name_xs:
         tick_x = name_x - 9
-        d.line((tick_x, row_y - TICK_HALF_HEIGHT, tick_x, row_y + TICK_HALF_HEIGHT), fill=DIVIDER, width=TICK_WIDTH)
+        d.line((tick_x, row_y - TICK_HALF_HEIGHT, tick_x, row_y + TICK_HALF_HEIGHT), fill=ACCENT, width=TICK_WIDTH)
 
 # Footer: entirely live monitor.json sensor fields -- status dot+text
 # (left), date_time (center), ip_address (right). Nothing left to draw

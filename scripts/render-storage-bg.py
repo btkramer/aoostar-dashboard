@@ -227,11 +227,14 @@ for row_label, label_y, bar_y, divider_y in (
 # 16th pass (2026-08-17): with the right color visible, 10px read as too
 # thick -- back to 5px (zone 4+5+4=13, name-temp/temp-dot pads restored
 # 4->6 since the wider 10px zone no longer needs the extra room).
+#
+# 18th pass (2026-08-17): NVMe temp row moved up 2px (316->314, matching
+# monitor.json's nvme_disk*_* y's).
 TICK_HALF_HEIGHT = 16
 TICK_WIDTH = 5
 for row_y, disk_name_xs in (
     (271, [82, 250, 418, 586, 754]),   # tank: disk1..5_name
-    (316, [40, 262, 484, 706]),        # nvme: nvme_disk1..4_name
+    (314, [40, 262, 484, 706]),        # nvme: nvme_disk1..4_name
 ):
     for name_x in disk_name_xs:
         tick_x = name_x - 7

@@ -164,9 +164,12 @@ for text, x in COL_X.items():
 # 124/196) -- still 6px real clearance to the capacity-detail text below
 # each (dynamic monitor.json field, unmoved), matching other verified-safe
 # junctions in this layout.
+#
+# 17th pass (2026-08-17): "slightly too much" -- nudged back up 3px
+# (131/203). Clearance to the detail text below grows to 9px.
 for row_label, label_y, bar_y, divider_y in (
-    ("TANK", 134, 163, 169),
-    ("NVME", 206, 235, 241),
+    ("TANK", 131, 163, 169),
+    ("NVME", 203, 235, 241),
 ):
     draw_spaced((40, label_y), row_label, row_label_font, WHITE, spacing=1)
     for x in COL_X.values():

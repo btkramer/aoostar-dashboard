@@ -240,6 +240,14 @@ for row_y, disk_name_xs in (
         tick_x = name_x - 7
         d.line((tick_x, row_y - TICK_HALF_HEIGHT, tick_x, row_y + TICK_HALF_HEIGHT), fill=ACCENT, width=TICK_WIDTH)
 
+# 19th pass (2026-08-17): a divider line between the tank/nvme temp rows,
+# same style as the ones under the TANK/NVME capacity rows above (DIVIDER
+# color, full-width, width=2). y=293 sits at the real midpoint of the gap
+# between the two rows' worst-case ink (row1 bottom 284.67, row2 top 301
+# at fontSize 30/26 -- verified with tools/pixel-probe), giving ~8px
+# clearance to each row, matching this page's other divider junctions.
+d.line((24, 293, 936, 293), fill=DIVIDER, width=2)
+
 # Footer: entirely live monitor.json sensor fields -- status dot+text
 # (left), date_time (center), ip_address (right). Nothing left to draw
 # here. See generate-storage-sensors.sh.

@@ -163,8 +163,8 @@ d.line((24, 72, 936, 72), fill=ACCENT, width=2)
 # scaling method as the 10th pass, re-verified with tools/pixel-probe
 # (tightest new junction: bar-to-divider, 3px, matching this page's
 # existing proven-safe pattern).
-row_label_font = bold(25)
-col_header_font = bold(26)
+row_label_font = bold(28)
+col_header_font = bold(23)
 COL_X = {"CAPACITY": 320, "READ": 560, "WRITE": 810}
 BAR_HALF_WIDTH = 70
 HEADER_Y = 100
@@ -180,8 +180,8 @@ for text, x in COL_X.items():
 # 17th pass (2026-08-17): "slightly too much" -- nudged back up 3px
 # (131/203). Clearance to the detail text below grows to 9px.
 for row_label, label_y, bar_y, divider_y in (
-    ("TANK", 126, 149, 155),
-    ("NVME", 181, 204, 210),
+    ("TANK", 118, 141, 147),
+    ("NVME", 173, 196, 202),
 ):
     draw_spaced((40, label_y), row_label, row_label_font, WHITE, spacing=1)
     for x in COL_X.values():

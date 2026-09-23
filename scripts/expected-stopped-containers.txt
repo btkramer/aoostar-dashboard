@@ -1,0 +1,35 @@
+# Container names that generate-container-sensors.sh should NOT flag as
+# "issues" when found in a stopped/exited state, regardless of exit code.
+# One name per line; '#'-prefixed lines and blank lines are ignored.
+#
+# Two categories currently populate this, both added 2026-09-23 during the
+# NPMplus -> Traefik reverse-proxy swap (see Docker login's containers/
+# traefik.md and containers/gatus.md for the full migration writeup):
+#
+# 1. Retired-but-kept-for-rollback: stopped on purpose, not deleted.
+nginx-proxy-manager
+#
+# 2. Sablier-gated: stopped/started on demand by the `sablier` idle
+# sidecar (30min idle timeout, auto-wakes on next request) to save RAM.
+# Being "exited" is their normal resting state, not a problem.
+stirling-pdf
+agent-canvas
+it-tools
+excalidraw
+scrutiny
+calibre-web
+bookshelf
+odysseus-odysseus-1
+odysseus-searxng-1
+odysseus-chromadb-1
+odysseus-ntfy-1
+romm
+romm-db
+romm-redis
+paperless
+paperless-db
+paperless-broker
+planka
+planka-db
+jellystat
+jellystat-db

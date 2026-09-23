@@ -67,6 +67,13 @@ DASHBOARD_DIR="${DASHBOARD_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}
 OUT_DIR="${SENSOR_DIR:-$DASHBOARD_DIR/sensors}"
 OUT_FILE="$OUT_DIR/alert.txt"
 STATE_FILE="$OUT_DIR/.alert-state"
+# Remembers whatever "normal" (non-alert) mianban was in effect right
+# before entering alert mode, so leaving alert mode restores THAT instead
+# of a hardcoded "1 2 3" -- otherwise a manual rotation pin (e.g. "3"
+# alone, 2026-08-17) silently reverts to full rotation the next time any
+# alert fires and clears. Bug found + fixed 2026-09-23, caught because a
+# routine test alert cleared and reverted a real pin.
+NORMAL_MIANBAN_FILE="$OUT_DIR/.alert-normal-mianban"
 MONITOR_JSON="$DASHBOARD_DIR/monitor.json"
 DEBOUNCE_CYCLES="${ALERT_DEBOUNCE_CYCLES:-10}"
 MAX_LINES=6
@@ -206,11 +213,25 @@ set_mianban() {
   chmod 777 "$MONITOR_JSON" 2>/dev/null || true
 }
 
+get_mianban() {
+  # Prints the current mianban indices, space-separated, by parsing the
+  # same fixed-formatting block set_mianban() writes.
+  awk '
+    /"mianban": \[/ { grab = 1; next }
+    grab && /^[ \t]*\]/ { grab = 0; next }
+    grab {
+      gsub(/[^0-9]/, "")
+      if (length($0)) printf "%s ", $0
+    }
+  ' "$MONITOR_JSON" | sed 's/ $//'
+}
+
 if [ "$total" -gt 0 ]; then
   pending_clear=0
   if [ "$active" -eq 0 ]; then
     pending_enter=$((pending_enter + 1))
     if [ "$pending_enter" -ge "$DEBOUNCE_CYCLES" ]; then
+      get_mianban > "$NORMAL_MIANBAN_FILE"
       set_mianban "1 4 2 4 3 4"
       systemctl restart aoostar-asterctl 2>/dev/null || true
       active=1
@@ -222,7 +243,11 @@ else
   if [ "$active" -eq 1 ]; then
     pending_clear=$((pending_clear + 1))
     if [ "$pending_clear" -ge "$DEBOUNCE_CYCLES" ]; then
-      set_mianban "1 2 3"
+      normal_mianban="1 2 3"
+      if [ -s "$NORMAL_MIANBAN_FILE" ]; then
+        normal_mianban="$(cat "$NORMAL_MIANBAN_FILE")"
+      fi
+      set_mianban "$normal_mianban"
       systemctl restart aoostar-asterctl 2>/dev/null || true
       active=0
       pending_clear=0

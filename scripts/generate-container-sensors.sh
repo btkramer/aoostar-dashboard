@@ -15,6 +15,11 @@ OUT_FILE="$OUT_DIR/containers.txt"
 # file was vanishing from tmpfs well within a day, most likely swept by
 # systemd's own periodic /run cleanup).
 UPDATES_CACHE="$DASHBOARD_DIR/sensors/.updates-cache"
+# Names to never flag as "issues" while stopped/exited, regardless of exit
+# code -- retired-but-kept-for-rollback containers and anything a sidecar
+# (e.g. Sablier) intentionally stops/starts on demand. See that file's own
+# header for what's in it and why (added 2026-09-23, NPMplus->Traefik swap).
+EXPECTED_STOPPED_FILE="$DASHBOARD_DIR/scripts/expected-stopped-containers.txt"
 MAX_NAMES=3
 
 mkdir -p "$OUT_DIR" "$DASHBOARD_DIR/sensors"
@@ -71,6 +76,19 @@ echo "$poll_now" > "$POLL_STATE_FILE"
 # again, this is now past the design inset, not just the safety margin.
 MAX_CHARS=36
 
+is_expected_stopped() {
+  local target="$1"
+  [ -r "$EXPECTED_STOPPED_FILE" ] || return 1
+  local line
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(echo -n "$line" | xargs)" # trim whitespace; also drops blank lines
+    [ -z "$line" ] && continue
+    [ "$line" = "$target" ] && return 0
+  done < "$EXPECTED_STOPPED_FILE"
+  return 1
+}
+
 running=0
 healthy=0
 issues=()
@@ -93,10 +111,15 @@ if command -v docker >/dev/null 2>&1; then
   done)
 
   # Exited containers with a non-zero exit code are flagged; a clean exit(0)
-  # is treated as an intentional one-shot/init container, not an issue.
+  # is treated as an intentional one-shot/init container, not an issue --
+  # except a name listed in EXPECTED_STOPPED_FILE, which is never flagged
+  # for being stopped regardless of exit code (a SIGTERM'd proxy container,
+  # for instance, commonly exits 143, which isn't "clean" but also isn't a
+  # crash -- see that file's header).
   while IFS=$'\t' read -r name code; do
     [ -z "$name" ] && continue
     [ "$code" = "0" ] && continue
+    is_expected_stopped "$name" && continue
     issues+=("${name#/}")
   done < <(docker ps -a --filter status=exited --format '{{.Names}}' | while read -r n; do
     printf '%s\t%s\n' "$n" "$(docker inspect -f '{{.State.ExitCode}}' "$n" 2>/dev/null || echo 0)"

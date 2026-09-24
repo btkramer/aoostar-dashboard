@@ -73,33 +73,111 @@ parse_image_ref() {
   printf '%s\t%s\t%s' "$host" "$repo" "$tag"
 }
 
-remote_digest() {
-  local host="$1" repo="$2" tag="$3"
-  local url="https://$host/v2/$repo/manifests/$tag"
-  local headers status
-  headers=$(curl -sS --max-time 10 -D - -o /dev/null -H "$ACCEPT" "$url" 2>/dev/null) || return 1
-  status=$(printf '%s' "$headers" | head -1 | grep -o '[0-9]\{3\}')
+# This host's real platform (confirmed via `uname -m`: x86_64 ->
+# linux/amd64) -- used below to pick the one manifest that's actually
+# relevant, out of a multi-arch image's several. Hardcoded, not detected at
+# runtime: this project has never run on anything but this one box.
+LOCAL_PLATFORM_OS="linux"
+LOCAL_PLATFORM_ARCH="amd64"
+
+# Bearer tokens, cached per "host repo" so a multi-arch image's two manifest
+# fetches (list, then the resolved platform manifest) -- and repeat hits on
+# the same repo across different containers sharing a base image, e.g.
+# postgres:16-alpine used by 3 containers here -- share one token instead
+# of each independently redoing the anonymous-probe -> 401 -> token-fetch
+# dance. Added 2026-09-24: back-to-back token requests for the same repo
+# were observed failing (empty token) when each fetch_manifest call
+# authenticated for itself -- looks like Docker Hub's auth endpoint doesn't
+# like rapid repeat requests for the same scope. Fetching once and reusing
+# fixed it outright and halves registry calls as a side effect.
+declare -A TOKEN_CACHE=()
+
+# GETs a manifest (tag or digest reference) and returns its raw JSON body.
+# Handles the 401 + WWW-Authenticate -> bearer-token retry itself, using
+# (and populating) TOKEN_CACHE above.
+fetch_manifest() {
+  local host="$1" repo="$2" ref="$3"
+  local url="https://$host/v2/$repo/manifests/$ref"
+  local cache_key="$host $repo"
+  local hdr_file out status
+
+  if [ -n "${TOKEN_CACHE[$cache_key]:-}" ]; then
+    out=$(curl -sS --max-time 10 -H "$ACCEPT" -H "Authorization: Bearer ${TOKEN_CACHE[$cache_key]}" "$url" 2>/dev/null) || return 1
+    printf '%s' "$out"
+    return 0
+  fi
+
+  hdr_file=$(mktemp /tmp/.manifest-headers.XXXXXX)
+  out=$(curl -sS --max-time 10 -D "$hdr_file" -H "$ACCEPT" "$url" 2>/dev/null) || { rm -f "$hdr_file"; return 1; }
+  status=$(head -1 "$hdr_file" | grep -o '[0-9]\{3\}')
   if [ "$status" = "401" ]; then
     local auth realm service scope token
-    auth=$(printf '%s' "$headers" | grep -i '^www-authenticate:' | tr -d '\r')
+    auth=$(grep -i '^www-authenticate:' "$hdr_file" | tr -d '\r')
     realm=$(printf '%s' "$auth" | sed -n 's/.*[Rr]ealm="\([^"]*\)".*/\1/p')
     service=$(printf '%s' "$auth" | sed -n 's/.*[Ss]ervice="\([^"]*\)".*/\1/p')
     scope=$(printf '%s' "$auth" | sed -n 's/.*[Ss]cope="\([^"]*\)".*/\1/p')
     [ -z "$scope" ] && scope="repository:$repo:pull"
+    rm -f "$hdr_file"
     [ -z "$realm" ] && return 1
     token=$(curl -fsS --max-time 10 "$realm?service=$service&scope=$scope" 2>/dev/null | jq -r '.token // .access_token // empty') || true
     [ -z "$token" ] && return 1
-    headers=$(curl -sS --max-time 10 -D - -o /dev/null -H "$ACCEPT" -H "Authorization: Bearer $token" "$url" 2>/dev/null) || return 1
+    TOKEN_CACHE[$cache_key]="$token"
+    out=$(curl -sS --max-time 10 -H "$ACCEPT" -H "Authorization: Bearer $token" "$url" 2>/dev/null) || return 1
+  else
+    rm -f "$hdr_file"
   fi
-  local digest
-  digest=$(printf '%s' "$headers" | grep -i '^docker-content-digest:' | awk '{print $2}' | tr -d '\r')
-  [ -z "$digest" ] && return 1
-  printf '%s' "$digest"
+  printf '%s' "$out"
+}
+
+# Returns the registry's current CONFIG digest for this image ref's actual
+# platform -- the same value `docker inspect -f '{{.Image}}'` reports for a
+# locally running container, i.e. the thing that actually changes when
+# `docker compose pull && up -d` would replace the container. Deliberately
+# NOT the tag's raw manifest digest: for a multi-arch tag that resolves to
+# a manifest LIST/index, the list's own digest bumps whenever ANY of its
+# ~9 platform builds gets rebuilt (arm/s390x/riscv64/etc., completely
+# unrelated to what's actually running here) even when the amd64 build --
+# the only one this host ever uses -- hasn't changed at all. Comparing that
+# list digest against the locally-recorded one is what caused two real
+# false positives (postgres:16-alpine, redis:7-alpine both flagged
+# indefinitely) -- root-caused 2026-09-24 with a peer session's help
+# (cross-checked via a platform-pinned `docker pull --platform linux/amd64`
+# + `docker inspect .Id`, matched exactly to the two-hop resolution below).
+remote_config_digest() {
+  local host="$1" repo="$2" tag="$3"
+  local body media_type
+  body=$(fetch_manifest "$host" "$repo" "$tag") || return 1
+  media_type=$(printf '%s' "$body" | jq -r '.mediaType // empty' 2>/dev/null)
+  case "$media_type" in
+  *manifest.list*|*image.index*)
+    local platform_digest
+    platform_digest=$(printf '%s' "$body" | jq -r --arg os "$LOCAL_PLATFORM_OS" --arg arch "$LOCAL_PLATFORM_ARCH" \
+      '.manifests[]? | select(.platform.os == $os and .platform.architecture == $arch) | .digest' \
+      2>/dev/null | head -1)
+    [ -z "$platform_digest" ] && return 1
+    body=$(fetch_manifest "$host" "$repo" "$platform_digest") || return 1
+    ;;
+  esac
+  local config_digest
+  config_digest=$(printf '%s' "$body" | jq -r '.config.digest // empty' 2>/dev/null)
+  [ -z "$config_digest" ] && return 1
+  printf '%s' "$config_digest"
 }
 
 tmp=$(mktemp "$CACHE_DIR/.updates-cache.XXXXXX")
 checked=0
 available=0
+
+# Caches remote_config_digest's result per "host repo tag" -- several
+# containers here share the exact same image (postgres:16-alpine alone
+# backs 3), and each now costs 2 registry GETs (list + resolved platform
+# manifest) instead of the original design's 1 HEAD-only probe. Real cost
+# of getting this check actually correct (2026-09-24) -- deduping repeat
+# hits on the same tag keeps the daily total from creeping toward Docker
+# Hub's 100/hr anonymous rate limit (confirmed hit while testing this fix,
+# recovers within its own 1hr window, unrelated to normal daily operation
+# but real all the same).
+declare -A DIGEST_RESULT_CACHE=()
 
 while IFS= read -r cid; do
   [ -z "$cid" ] && continue
@@ -110,15 +188,19 @@ while IFS= read -r cid; do
   parsed=$(parse_image_ref "$image_ref") || { log "$name: pinned by digest or unparseable ref ($image_ref), skipping"; continue; }
   IFS=$'\t' read -r host repo tag <<<"$parsed"
 
-  local_digest=$(docker image inspect -f '{{range .RepoDigests}}{{.}} {{end}}' "$image_id" 2>/dev/null | awk '{print $1}' | sed 's/.*@//') || true
-  if [ -z "$local_digest" ]; then
-    log "$name: no local RepoDigest (locally built/tagged image), skipping"; continue
+  # $image_id (docker inspect's .Image, "sha256:...") IS the image's config
+  # digest by the OCI/Docker image spec -- compared directly against the
+  # registry's config digest below, no RepoDigests lookup needed.
+  digest_key="$host $repo $tag"
+  if [ -n "${DIGEST_RESULT_CACHE[$digest_key]:-}" ]; then
+    remote="${DIGEST_RESULT_CACHE[$digest_key]}"
+  else
+    remote="$(remote_config_digest "$host" "$repo" "$tag")" || { log "$name: registry check failed for $host/$repo:$tag"; continue; }
+    DIGEST_RESULT_CACHE[$digest_key]="$remote"
   fi
-
-  remote="$(remote_digest "$host" "$repo" "$tag")" || { log "$name: registry check failed for $host/$repo:$tag"; continue; }
   checked=$((checked + 1))
 
-  if [ "$remote" != "$local_digest" ]; then
+  if [ "$remote" != "$image_id" ]; then
     printf '%s\t1\n' "$name" >> "$tmp"
     available=$((available + 1))
     log "$name: update available ($host/$repo:$tag)"

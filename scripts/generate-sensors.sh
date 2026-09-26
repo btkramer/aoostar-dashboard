@@ -9,6 +9,18 @@ DASHBOARD_DIR="${DASHBOARD_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}
 # on-disk location for manual/local testing (see README.md).
 OUT_DIR="${SENSOR_DIR:-$DASHBOARD_DIR/sensors}"
 OUT_FILE="$OUT_DIR/dashboard.txt"
+# Auto-detects the interface actually carrying the default route, falling
+# back to the old hardcoded NIC name only if that detection comes up empty
+# (e.g. a transient routing hiccup) -- NOT hardcoded outright, after
+# `enp101s0` silently stopped holding the host's IP: 2026-09-24's NPMplus->
+# Traefik proxy swap (or a related TrueNAS network change around the same
+# time -- exact cause unconfirmed, ask the Docker login) enslaved it under
+# a new bridge, `br0`, which now carries 192.168.1.5. `ip_address` below
+# showed "Offline" for at least 2 days before caught 2026-09-26 (user
+# report: LCD's IP corner reads offline while the box is clearly up) --
+# static interface names aren't safe to assume stay put across host
+# network changes this project doesn't control.
+NET_IFACE="${NET_IFACE:-$(ip route show default 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="dev") {print $(i+1); exit}}')}"
 NET_IFACE="${NET_IFACE:-enp101s0}"
 POOL_NAME="${POOL_NAME:-tank}"
 STATE_FILE="$OUT_DIR/.network-state"

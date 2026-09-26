@@ -2,8 +2,25 @@
 Description=Run the AOOSTAR dashboard container update check once a day
 
 [Timer]
-OnCalendar=daily
-RandomizedDelaySec=1800
+# 04:30 America/Phoenix (host clock's own timezone, confirmed via
+# `timedatectl`, no UTC conversion needed) -- deliberately AFTER Dockhand's
+# own nightly auto-update sweep (fixed per-container cron slots, 03:00-
+# 03:55 Phoenix, confirmed with the Docker login) and its own 04:00
+# failure/missed-tick check, so this project's "needs update" list
+# reflects Dockhand's overnight work instead of catching containers before
+# it fixes them. Was `OnCalendar=daily` (midnight + up to 30min random
+# delay, so ~00:1x-00:4x MST) until 2026-09-26 -- that ran BEFORE the
+# sweep, causing real same-night staleness (a container Dockhand auto-
+# updated at ~3am still showed "needs update" here until the next day's
+# run) -- happened with gatus (2026-09-24) and 4 more containers
+# (2026-09-26, caught via user report of an LCD/ntfy mismatch that turned
+# out to be two correct systems checking at different times, not a bug in
+# either). RandomizedDelaySec kept short: 56 of the sweep's 60 per-minute
+# slots are in use, so it can occasionally spill past 03:55 -- a few
+# minutes of jitter here is fine, don't widen this back toward 30min or it
+# risks landing before a late-running sweep finishes again.
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=300
 Persistent=true
 
 [Install]

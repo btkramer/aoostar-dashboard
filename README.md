@@ -4,7 +4,7 @@ A custom front-panel dashboard for the **AOOSTAR WTR MAX** NAS. It replaces the 
 screens with clean, distance-readable pages for system health, containers and storage, plus
 an alert page that cuts into the rotation only when something is actually wrong.
 
-![Container Overview page](img/preview-container-overview-healthy.png)
+![Container Overview page, healthy and with issues](docs/images/screenshot.png)
 
 ## Pages
 

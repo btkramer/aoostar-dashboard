@@ -1,5 +1,12 @@
 # AOOSTAR WTR MAX Dashboard
 
+![Bash](https://img.shields.io/badge/Bash-4EAA25?logo=gnubash&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-pixel--probe-000000?logo=rust&logoColor=white)
+![TrueNAS](https://img.shields.io/badge/TrueNAS-SCALE-0095D5?logo=truenas&logoColor=white)
+![systemd](https://img.shields.io/badge/systemd-units-555)
+![Status](https://img.shields.io/badge/status-in%20use-2ea44f)
+
 A custom front-panel dashboard for the **AOOSTAR WTR MAX** NAS. It replaces the factory LCD
 screens with clean, distance-readable pages for system health, containers and storage, plus
 an alert page that cuts into the rotation only when something is actually wrong.
@@ -18,6 +25,18 @@ The 960 × 376 front LCD rotates through:
 | **Alerts** *(only when needed)* | Faulted or degraded pools, disk errors, over-temperature, container problems or a nearly full boot drive. Shown most severe first, and interleaved between the other pages until the condition clears |
 
 ## How it works
+
+```mermaid
+flowchart LR
+  SRC["/proc, hwmon, zpool,<br/>docker ps / inspect"] --> GEN["sensor scripts<br/>(1 s loop)"]
+  GEN --> TMP["sensor files<br/>on tmpfs"]
+  REG["Registries<br/>(daily digest check)"] --> UPD[".updates-cache"] --> TMP
+  SUP["alert supervisor"] -- "swaps rotation" --> CFG["monitor.json"]
+  TMP --> AST["asterctl"]
+  CFG --> AST
+  AST -- "USB serial" --> LCD["Front-panel LCD<br/>960 × 376"]
+```
+
 
 - Runs on [`asterctl`](https://github.com/zehnm/aoostar-rs), the open-source driver for
   AOOSTAR's panel, using the standard AOOSTAR-X panel format (`monitor.json` plus SVG/PNG

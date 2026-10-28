@@ -11,7 +11,7 @@ A custom front-panel dashboard for the **AOOSTAR WTR MAX** NAS. It replaces the 
 screens with clean, distance-readable pages for system health, containers and storage, plus
 an alert page that cuts into the rotation only when something is actually wrong.
 
-![Container Overview page, healthy and with issues](docs/images/screenshot.png)
+![System Overview page](docs/images/system.png)
 
 ## Pages
 
@@ -23,6 +23,20 @@ The 960 × 376 front LCD rotates through:
 | **Container Overview** | Running / Healthy / Issues / Updates-available counts, plus a one-line status naming whatever needs attention |
 | **Storage Overview** | One row per pool (capacity, read, write) and a per-disk grid with temperature and health |
 | **Alerts** *(only when needed)* | Faulted or degraded pools, disk errors, over-temperature, container problems or a nearly full boot drive. Shown most severe first, and interleaved between the other pages until the condition clears |
+
+### Every page
+
+| | |
+|:---:|:---:|
+| ![System Overview](docs/images/system.png) | ![Storage Overview](docs/images/storage.png) |
+| **System**: CPU/GPU load and temperature, memory, pool, network, uptime | **Storage**: pool and NVMe capacity and throughput, per-disk temperature and health |
+| ![Container Overview, healthy](docs/images/containers.png) | ![Container Overview, with issues](docs/images/containers-issues.png) |
+| **Containers**: all healthy, with pending image updates listed | **Containers**: unhealthy containers named in red |
+
+![Alert page](docs/images/alerts.png)
+
+<sub><b>Alerts</b>: this page appears only while something is wrong, most severe first. These renders use
+<code>tools/pixel-probe</code>, which reproduces asterctl's exact text placement; the values are sample data.</sub>
 
 ## How it works
 
